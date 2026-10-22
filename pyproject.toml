@@ -1,0 +1,4 @@
+# Only tool configuration lives here; the gateway is run as the `gateway` package from the repo root.
+[tool.pytest.ini_options]
+testpaths = ["gateway/tests"]
+addopts = "-q"

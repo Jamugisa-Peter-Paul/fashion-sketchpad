@@ -1,0 +1,153 @@
+# Everything the app shows as a tappable choice, plus the words each choice puts into the prompt.
+# Edit freely: the gateway reloads this file at startup. Keep ids stable once designs reference them.
+#
+# `prompt` is what gets written into the render prompt. Flux does not reliably know regional garment and
+# fabric names, so those entries describe the construction in plain words.
+
+garments:
+  # placement: where the garment sits on the body, used to auto-place paper sketches on a template.
+  #   top = shoulders to hip, bottom = waist down, full = shoulders down past the knee.
+  - { id: shirt, label: Shirt, placement: top, prompt: "button-up shirt" }
+  - { id: blouse, label: Blouse, placement: top, prompt: "blouse" }
+  - { id: dress, label: Dress, placement: full, prompt: "dress" }
+  - { id: skirt, label: Skirt, placement: bottom, prompt: "skirt" }
+  - { id: trousers, label: Trousers, placement: bottom, prompt: "trousers" }
+  - { id: shorts, label: Shorts, placement: bottom, prompt: "shorts" }
+  - { id: suit, label: Suit, placement: full, prompt: "two-piece suit with a tailored jacket and matching trousers" }
+  - { id: jacket, label: Jacket, placement: top, prompt: "jacket" }
+  - { id: coat, label: Coat, placement: full, prompt: "coat" }
+  - { id: hoodie, label: Hoodie, placement: top, prompt: "hoodie" }
+  - id: kaftan
+    label: Kaftan
+    placement: full
+    prompt: "kaftan, a long loose robe-like tunic with wide sleeves and a slit neckline"
+  - id: gomesi
+    label: Gomesi
+    placement: full
+    prompt: >-
+      gomesi (Ugandan busuuti), a floor-length dress with high peaked puffed shoulders,
+      a square neckline with a short front button placket, and a wide sash tied around the hips
+  - id: kanzu
+    label: Kanzu
+    placement: full
+    prompt: >-
+      kanzu, an ankle-length long-sleeved robe with a round collarless neckline
+      and a narrow embroidered placket ending in a small tassel at the neck
+  - { id: two_piece, label: Two-piece, placement: full, prompt: "matching two-piece set of a top and a bottom" }
+  - { id: jumpsuit, label: Jumpsuit, placement: full, prompt: "jumpsuit" }
+
+fabrics:
+  - { id: cotton, label: Cotton, prompt: "cotton" }
+  - { id: cotton_twill, label: Cotton twill, prompt: "cotton twill" }
+  - { id: linen, label: Linen, prompt: "linen" }
+  - { id: denim, label: Denim, prompt: "denim" }
+  - { id: silk, label: Silk, prompt: "silk" }
+  - { id: satin, label: Satin, prompt: "satin" }
+  - { id: wool, label: Wool, prompt: "wool" }
+  - { id: knit, label: Knit, prompt: "fine knit" }
+  - { id: leather, label: Leather, prompt: "leather" }
+  - { id: kitenge, label: Kitenge / wax print, prompt: "African wax print cotton (kitenge)" }
+  - { id: barkcloth, label: Barkcloth, prompt: "Ugandan barkcloth, a textured fibrous bark fabric" }
+
+# Named colours. Custom colours from the picker are described by the nearest name here plus their hex.
+colours:
+  - { id: black, label: Black, hex: "#1C1C1C", prompt: "black" }
+  - { id: white, label: White, hex: "#F5F5F0", prompt: "off-white" }
+  - { id: ivory, label: Ivory, hex: "#F2EBDD", prompt: "ivory" }
+  - { id: camel, label: Camel, hex: "#C2A878", prompt: "camel tan" }
+  - { id: chocolate, label: Chocolate, hex: "#5A3A24", prompt: "chocolate brown" }
+  - { id: terracotta, label: Terracotta, hex: "#C0603E", prompt: "terracotta" }
+  - { id: mustard, label: Mustard, hex: "#D4A017", prompt: "mustard yellow" }
+  - { id: orange, label: Orange, hex: "#E5762A", prompt: "orange" }
+  - { id: red, label: Red, hex: "#B0202E", prompt: "crimson red" }
+  - { id: burgundy, label: Burgundy, hex: "#6D1F2F", prompt: "burgundy" }
+  - { id: blush, label: Blush, hex: "#E8B4B8", prompt: "blush pink" }
+  - { id: lavender, label: Lavender, hex: "#B3A1CC", prompt: "lavender" }
+  - { id: sky, label: Sky blue, hex: "#8FB8DE", prompt: "sky blue" }
+  - { id: royal, label: Royal blue, hex: "#2851A3", prompt: "royal blue" }
+  - { id: navy, label: Navy, hex: "#1F2A44", prompt: "navy blue" }
+  - { id: emerald, label: Emerald, hex: "#1E7A53", prompt: "emerald green" }
+  - { id: olive, label: Olive, hex: "#6B7445", prompt: "olive green" }
+  - { id: charcoal, label: Charcoal, hex: "#3C3E42", prompt: "charcoal grey" }
+
+# {colour} is replaced with the colour wording, e.g. "camel tan (#C2A878)".
+prints:
+  - { id: plain, label: Plain, prompt: "plain {colour}" }
+  - { id: kitenge, label: Kitenge / wax, prompt: "bold African kitenge wax print with a dominant {colour} pattern" }
+  - { id: stripes, label: Stripes, prompt: "{colour} and white striped" }
+  - { id: checks, label: Checks, prompt: "{colour} checked" }
+  - { id: floral, label: Floral, prompt: "floral print on a {colour} ground" }
+
+fits:
+  - { id: fitted, label: Fitted, prompt: "slim fitted" }
+  - { id: regular, label: Regular, prompt: "regular fit" }
+  - { id: loose, label: Loose, prompt: "loose relaxed fit" }
+
+buttons:
+  - { id: default, label: Any, prompt: "" }
+  - { id: wood, label: Wood, prompt: "wooden buttons" }
+  - { id: gold, label: Gold, prompt: "gold metal buttons" }
+  - { id: black, label: Black, prompt: "black buttons" }
+  - { id: horn, label: Horn, prompt: "horn buttons" }
+  - { id: hidden, label: Hidden, prompt: "a concealed button placket" }
+
+stitching:
+  - { id: tonal, label: Tonal, prompt: "tonal stitching" }
+  - { id: contrast, label: Contrast, prompt: "contrast topstitching" }
+
+# {garment} = full garment description, {mannequin} = finish + body, e.g. "matte dark grey slim female".
+scenes:
+  - id: light_room
+    label: Light Room
+    default: true
+    on_mannequin: true
+    prompt: >-
+      Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
+      standing straight, full body from head to feet, in a bright minimalist studio with a large window on the
+      left, soft natural daylight casting window shadows on the light grey wall and polished floor, exact garment
+      construction, crisp seams and stitching, realistic fabric texture, high-end fashion lookbook
+  - id: plain_studio
+    label: Plain studio
+    on_mannequin: true
+    prompt: >-
+      Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
+      standing straight, full body from head to feet, plain light grey seamless studio background, soft even
+      studio lighting, exact garment construction, crisp seams and stitching, realistic fabric texture,
+      high-end fashion lookbook
+  - id: product_shot
+    label: Product shot
+    on_mannequin: false
+    prompt: >-
+      Photorealistic ghost mannequin product photograph of {garment}, the garment fills the frame, nothing below
+      the hem, plain light grey studio background, soft even lighting, exact garment construction, crisp seams
+      and topstitching, realistic fabric texture, e-commerce lookbook
+
+mannequin_finishes:
+  - { id: matte_dark_grey, label: Matte dark grey, default: true, prompt: "matte dark grey" }
+  - { id: chrome_silver, label: Chrome silver, prompt: "chrome silver" }
+  - { id: matte_white, label: Matte white, prompt: "matte white" }
+
+# Body ids must match the template folder names. group: women | men | kids.
+bodies:
+  - { id: female_slim, label: Slim, group: women, prompt: "slim female" }
+  - { id: female_average, label: Average, group: women, prompt: "average female" }
+  - { id: female_hourglass, label: Hourglass, group: women, prompt: "hourglass-figure female" }
+  - { id: female_pear, label: Pear, group: women, prompt: "pear-shaped female" }
+  - { id: female_apple, label: Apple, group: women, prompt: "apple-shaped female" }
+  - { id: female_athletic, label: Athletic, group: women, prompt: "athletic female" }
+  - { id: female_plus, label: Plus, group: women, prompt: "plus-size female" }
+  - { id: female_petite, label: Petite, group: women, prompt: "petite female" }
+  - { id: female_tall, label: Tall, group: women, prompt: "tall female" }
+  - { id: female_maternity, label: Maternity, group: women, prompt: "pregnant female maternity" }
+  - { id: male_slim, label: Slim, group: men, prompt: "slim male" }
+  - { id: male_average, label: Average, group: men, prompt: "average male" }
+  - { id: male_athletic, label: Athletic, group: men, prompt: "athletic male" }
+  - { id: male_stocky, label: Stocky, group: men, prompt: "stocky male" }
+  - { id: male_plus, label: Plus, group: men, prompt: "plus-size male" }
+  - { id: male_tall, label: Tall, group: men, prompt: "tall male" }
+  - { id: male_short, label: Short, group: men, prompt: "short male" }
+  - { id: toddler, label: Toddler, group: kids, prompt: "toddler child" }
+  - { id: girl_child, label: Girl, group: kids, prompt: "young girl child" }
+  - { id: boy_child, label: Boy, group: kids, prompt: "young boy child" }
+  - { id: girl_teen, label: Teen girl, group: kids, prompt: "teenage girl" }
+  - { id: boy_teen, label: Teen boy, group: kids, prompt: "teenage boy" }
