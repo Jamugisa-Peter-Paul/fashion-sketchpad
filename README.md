@@ -5,7 +5,8 @@ self-hosted ComfyUI server.
 
 - `gateway/`: FastAPI service that runs next to ComfyUI on the server
 - `app/`: Next.js + Capacitor mobile app (Android first)
-- `docs/`: [Architecture](docs/ARCHITECTURE.md)
+- `docs/`: [Architecture](docs/ARCHITECTURE.md), [Deploying the gateway](docs/DEPLOY.md)
+- `deploy/`: systemd unit and smoke-test script
 
 ## Gateway: local development (Windows, Python 3.12+)
 

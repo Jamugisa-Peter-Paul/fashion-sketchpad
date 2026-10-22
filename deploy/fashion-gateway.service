@@ -1,0 +1,25 @@
+[Unit]
+Description=Fashion Sketchpad gateway (FastAPI in front of ComfyUI)
+After=network-online.target comfyui.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dct
+Group=dct
+WorkingDirectory=/home/dct/fashion-sketchpad
+EnvironmentFile=/etc/fashion-gateway.env
+# Exactly one worker: the render queue lives in this process.
+ExecStart=/home/dct/fashion-sketchpad/.venv/bin/uvicorn gateway.main:create_app --factory --host 127.0.0.1 --port 8190 --workers 1
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the gateway only writes to its data dir and reads the body templates.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/dct/fashion-data
+
+[Install]
+WantedBy=multi-user.target
