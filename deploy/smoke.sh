@@ -23,11 +23,16 @@ CLEAN_ID=$(curl -fsS -H "$AUTH" -F "image=@$IMAGE" -F source=paper -F garment=sh
 echo "   clean_id=$CLEAN_ID"
 curl -fsS -H "$AUTH" -o /tmp/fashion-smoke-lines.png "$BASE/api/sketch/$CLEAN_ID/lines.png" && echo "   lines -> /tmp/fashion-smoke-lines.png"
 
+# A full, explicit style: camel tan cotton twill shirt with wooden buttons, Light Room, dark grey mannequin.
+STYLE='{"garment":"shirt","body":"female_slim","colour":"camel","print":"plain","fabric":"cotton_twill","fit":"regular","buttons":"wood","stitching":"tonal","scene":"light_room","finish":"matte_dark_grey"}'
+
 echo "== generate"
-JOB_ID=$(curl -fsS -H "$AUTH" -H "Content-Type: application/json" \
-  -d "{\"title\":\"Smoke test\",\"style\":{\"garment\":\"shirt\",\"body\":\"female_slim\",\"colour\":\"camel\",\"fabric\":\"cotton_twill\"},\"views\":{\"front\":{\"clean_id\":\"$CLEAN_ID\"}}}" \
-  "$BASE/api/generate" | json "['job_id']")
-echo "   job_id=$JOB_ID"
+JOB=$(curl -fsS -H "$AUTH" -H "Content-Type: application/json" \
+  -d "{\"title\":\"Smoke test\",\"style\":$STYLE,\"views\":{\"front\":{\"clean_id\":\"$CLEAN_ID\"}}}" \
+  "$BASE/api/generate")
+JOB_ID=$(echo "$JOB" | json "['job_id']")
+DESIGN_ID=$(echo "$JOB" | json "['design_id']")
+echo "   job_id=$JOB_ID design_id=$DESIGN_ID"
 
 for _ in $(seq 1 120); do
   STATUS=$(curl -fsS -H "$AUTH" "$BASE/api/jobs/$JOB_ID")
@@ -37,6 +42,10 @@ for _ in $(seq 1 120); do
   sleep 5
 done
 echo "$STATUS"
+echo "== prompt sent to ComfyUI"
+curl -fsS -H "$AUTH" "$BASE/api/designs/$DESIGN_ID" | json "['renders'][-1]['views']['front']['prompt']"
+curl -fsS -H "$AUTH" -o /tmp/fashion-smoke-check.png "$BASE/api/jobs/$JOB_ID/front/check.png" \
+  && echo "== placement check saved to /tmp/fashion-smoke-check.png (red = sketch, blue = neck/shoulders/waist/hips)"
 [[ "$STATE" == "done" ]] || { echo "FAILED"; exit 1; }
 curl -fsS -H "$AUTH" -o /tmp/fashion-smoke-render.png "$BASE/api/jobs/$JOB_ID/front.png"
 echo "== OK: render saved to /tmp/fashion-smoke-render.png"

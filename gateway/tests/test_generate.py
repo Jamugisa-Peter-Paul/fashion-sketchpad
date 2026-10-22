@@ -77,6 +77,12 @@ def test_front_and_back_render_with_same_seed(client: TestClient, fake_comfy: Fa
     assert back_prompt == "Back view. " + front_prompt
     assert "15" in workflows[0]  # body depth ControlNet is used on the template
 
+    # A placement check image is written for every job and view.
+    for view in ("front", "back"):
+        check = client.get(f"/api/jobs/{ids['job_id']}/{view}/check.png", headers=AUTH)
+        assert check.status_code == 200
+        assert Image.open(io.BytesIO(check.content)).size == (CANVAS_W, CANVAS_H)
+
 
 def test_variation_and_colour_change_reuse_the_design(client: TestClient, fake_comfy: FastAPI) -> None:
     first = generate(client, views={"front": {"clean_id": clean(client, "shirt_front_paper.jpeg")}}, seed=42)

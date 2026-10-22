@@ -19,7 +19,15 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from gateway.catalog import load_catalog
-from gateway.placement import default_landmarks, landmarks_from_mask, load_mask, suggest_placement
+from gateway.placement import (
+    BodyLandmarks,
+    check_image,
+    default_landmarks,
+    ink_extent,
+    landmarks_from_mask,
+    load_mask,
+    suggest_placement,
+)
 from gateway.sketch import (
     CANVAS_H,
     CANVAS_W,
@@ -37,17 +45,19 @@ from gateway.templates import find_view
 DEFAULT_OUT = Path(__file__).parent / "out"
 
 
-def _check_image(original: Image.Image, bbox: tuple[int, int, int, int] | None, control: np.ndarray, guide: Path | None) -> Image.Image:
+def _check_sheet(
+    original: Image.Image,
+    bbox: tuple[int, int, int, int] | None,
+    control: np.ndarray,
+    body: BodyLandmarks | None,
+    background: Path | None,
+) -> Image.Image:
+    """Original with the crop box (red) | placement check: control lines over the template with landmarks."""
     left = original.convert("RGB")
     if bbox:
         ImageDraw.Draw(left).rectangle(bbox, outline=(220, 30, 30), width=max(2, left.width // 200))
     left.thumbnail((CANVAS_W, CANVAS_H))
-
-    right = Image.new("RGB", (CANVAS_W, CANVAS_H), (255, 255, 255))
-    if guide:
-        right.paste(Image.open(guide).convert("RGBA"), (0, 0), Image.open(guide).convert("RGBA"))
-    ink = Image.fromarray(np.minimum(control.astype(np.uint16) * 2, 255).astype(np.uint8))
-    right.paste(Image.new("RGB", right.size, (20, 20, 20)), (0, 0), ink)
+    right = check_image(control, body, background)
 
     sheet = Image.new("RGB", (CANVAS_W * 2 + 16, CANVAS_H), (60, 60, 60))
     sheet.paste(left, (0, 0))
@@ -88,21 +98,30 @@ def main() -> None:
             crop = lines if scene.on_mannequin else crop_to_content(lines)
 
         h, w = crop.shape
+        body = None
         if not scene.on_mannequin:
             placement = product_shot_placement(w, h)
-        elif args.source == "drawn":
-            placement = Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0)
         else:
             mask = template.mask if template else None
-            landmarks = landmarks_from_mask(load_mask(mask)) if mask else default_landmarks()
-            placement = suggest_placement(w, h, "figure" if args.whole_body else garment.placement, landmarks)
+            body = landmarks_from_mask(load_mask(mask)) if mask else default_landmarks()
+            if args.source == "drawn":
+                placement = Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0)
+            else:
+                placement = suggest_placement(crop, "figure" if args.whole_body else garment.placement, body)
         control = place_on_canvas(crop, placement)
 
         stem = args.out / path.stem.replace(" ", "_")
         Image.fromarray(crop).save(f"{stem}_lines.png")
         Image.fromarray(control).save(f"{stem}_control.png")
-        _check_image(picture, bbox, control, template.guide if template else None).save(f"{stem}_check.png")
-        print(f"{path.name}: crop {w}x{h}, placement cx={placement.cx:.0f} cy={placement.cy:.0f} scale={placement.scale:.2f} -> {stem}_*.png")
+        background = (template.photo or template.guide) if template else None
+        _check_sheet(picture, bbox, control, body, background).save(f"{stem}_check.png")
+        x0, y0, x1, y1 = ink_extent(control)
+        print(f"{path.name}: crop {w}x{h}, scale {placement.scale:.2f}, on canvas x {x0}-{x1} y {y0}-{y1} -> {stem}_*.png")
+        if body:
+            print(
+                f"  body: neck {body.neck:.0f}, shoulders {body.shoulder:.0f} (width {body.shoulder_width:.0f}),"
+                f" waist {body.waist:.0f}, hips {body.hip:.0f}; garment width {x1 - x0 + 1}"
+            )
 
 
 if __name__ == "__main__":

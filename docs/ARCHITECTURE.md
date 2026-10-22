@@ -79,8 +79,12 @@ appear in the catalog with `available: false`, so the app can show them as "not 
      those tests and are dropped, so they don't get printed into the render.
    - *Drawn:* flatten onto white and invert. Kept aligned with the template.
    - *Placement:* for on-mannequin scenes a cropped paper sketch is auto-placed on the body by garment
-     `placement` (top / bottom / full, or `figure` when the sketch shows a whole body), using
-     landmarks measured from the template mask (`gateway/placement.py`). The app shows it over the guide and the
+     `placement` (`gateway/placement.py`). The body is measured from the template mask at fixed
+     fractions of its height: neck 16%, shoulders 20% (shoulder width measured there), waist 38%,
+     hips 50%. For tops and full-length garments the sketch's own shoulder width (where the shoulder
+     seams turn into sleeves) is scaled to the body's, with the collar at the neck. The sketch's
+     proportions then carry the hem to the hips, knees or floor. Bottoms match the waistband to the
+     waist, and `figure` (whole-body sketches) maps head to feet. The app shows it over the guide and the
      user can drag or pinch to adjust before generating.
    - *Product shot:* crop to the bounding box plus 30 px and scale to fill about 94% of the canvas.
    Every sketch, drawn or photographed, goes through `/api/sketch/clean` once. Generate then refers to
@@ -90,7 +94,8 @@ appear in the catalog with `available: false`, so the app can show them as "not 
 3. **Workflow.** UnetLoaderGGUF + DualCLIPLoader(flux) + VAE, FluxGuidance 3.5, ControlNet Union Pro 2.0
    on the lines image (strength 0.85, end 0.85), EmptySD3LatentImage 832×1216, KSampler euler/simple
    with 28 steps and cfg 1. For on-mannequin scenes drawn on a template, a second ControlNet uses the body
-   depth image (strength ≈0.4, end ≈0.5). This is off for product shots.
+   depth image at strength 0.3, end 0.4, kept light so it can't overpower the garment lines. This is
+   off for product shots. On-mannequin prompts also say the mannequin is fully dressed in the garment.
 4. **Queue** (`gateway/jobs.py`). One worker submits views one after another (`/upload/image`,
    `/prompt`, poll `/history/{id}`, `/view`) and copies results into the design folder. Expect about
    60 s per view. The ComfyUI `prompt_id` is saved, so after a gateway restart a view ComfyUI still
@@ -107,7 +112,9 @@ DATA_DIR/designs/<design_id>/
   design.json            choices, input method, body, garment, render history
   sketch_<view>.png      what the user drew / uploaded (normalised)
   lines_<view>.png       cleaned lines crop (full canvas for drawn sketches)
-  control_<view>.png     last 832x1216 control image sent to ComfyUI (for debugging)
+  control_<view>.png     last 832x1216 control image sent to ComfyUI
+  check_<job_id>_<view>.png  placement check: control lines over the template with neck/shoulder/waist/hip
+                         lines (GET /api/jobs/{id}/{view}/check.png)
   render_<job_id>_<view>.png
 ```
 

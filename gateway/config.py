@@ -32,8 +32,10 @@ class RenderSettings:
     guidance: float = 3.5  # [RENDER_GUIDANCE]
     lines_strength: float = 0.85  # [LINES_STRENGTH]
     lines_end: float = 0.85  # [LINES_END]
-    depth_strength: float = 0.4  # [DEPTH_STRENGTH] 0 disables the body-shape ControlNet
-    depth_end: float = 0.5  # [DEPTH_END]
+    # Body-shape ControlNet, only used on a body template. Kept light so it shapes the mannequin without
+    # overpowering the garment lines (at 0.4 / 0.5 it rendered a bare mannequin under a too-small garment).
+    depth_strength: float = 0.3  # [DEPTH_STRENGTH] 0 disables it
+    depth_end: float = 0.4  # [DEPTH_END]
     view_hint: bool = True  # [VIEW_HINT] prefix "Back view." / "Side view." to non-front prompts
     view_timeout_s: int = 600  # give up on a view after this long
     poll_interval_s: float = 1.0

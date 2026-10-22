@@ -7,8 +7,10 @@ jobs are re-queued at startup, and a view that ComfyUI already finished is fetch
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
@@ -20,7 +22,7 @@ from gateway.comfy import ComfyClient, ComfyError
 from gateway.config import Settings
 from gateway.designs import DesignNotFound, DesignStore
 from gateway.models import Design, DesignView, Render, RenderView, View
-from gateway.placement import default_landmarks, landmarks_from_mask, load_mask, suggest_placement
+from gateway.placement import BodyLandmarks, check_image, default_landmarks, landmarks_from_mask, load_mask, suggest_placement
 from gateway.prompts import StyleOptions, build_prompt
 from gateway.sketch import (
     CANVAS_H,
@@ -40,25 +42,40 @@ log = logging.getLogger(__name__)
 SECONDS_PER_VIEW = 60  # observed on the RTX A4000; only used for the progress estimate
 
 
-def control_image(
+@dataclass
+class Control:
+    image: np.ndarray  # 832x1216 white-on-black lines fed to the lines ControlNet
+    body: BodyLandmarks | None  # body it was placed on (None for product shots)
+    background: Path | None  # template photo/outline, for the placement check image
+
+
+def compose_control(
     folder: Path, view: str, design_view: DesignView, style: StyleOptions, catalog: Catalog, templates_dir: Path
-) -> np.ndarray:
-    """The 832x1216 white-on-black image fed to the lines ControlNet."""
+) -> Control:
     crop = np.asarray(Image.open(folder / f"lines_{view}.png").convert("L"))
     if not catalog.scene(style.scene).on_mannequin:
         if design_view.source == "drawn":
             crop = crop_to_content(crop)
         h, w = crop.shape
-        return place_on_canvas(crop, product_shot_placement(w, h))
+        return Control(place_on_canvas(crop, product_shot_placement(w, h)), None, None)
+
+    template = find_view(templates_dir, style.body, view)
+    body = landmarks_from_mask(load_mask(template.mask)) if template.mask else default_landmarks()
+    background = template.photo or template.guide
     if design_view.source == "drawn":
-        return place_on_canvas(crop, Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0))  # already aligned
-    placement = design_view.placement
-    if placement is None:
-        template = find_view(templates_dir, style.body, view)
-        landmarks = landmarks_from_mask(load_mask(template.mask)) if template.mask else default_landmarks()
-        p = suggest_placement(design_view.width, design_view.height, catalog.garment(style.garment).placement, landmarks)
-        return place_on_canvas(crop, p)
-    return place_on_canvas(crop, Placement(placement.cx, placement.cy, placement.scale))
+        placement = Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0)  # drawn on the guide: already aligned
+    elif design_view.placement is not None:  # the user's placement from the app
+        placement = Placement(design_view.placement.cx, design_view.placement.cy, design_view.placement.scale)
+    else:
+        placement = suggest_placement(crop, catalog.garment(style.garment).placement, body)
+    return Control(place_on_canvas(crop, placement), body, background)
+
+
+def control_files(control: Control) -> tuple[bytes, bytes]:
+    """PNG of the control image and of its placement check (lines over the template, with landmarks)."""
+    check = io.BytesIO()
+    check_image(control.image, control.body, control.background).save(check, format="PNG")
+    return to_png(control.image), check.getvalue()
 
 
 def _find_render(design: Design, job_id: str) -> Render:
@@ -204,10 +221,12 @@ class RenderQueue:
         folder = self.store.folder(design.id)
         style = render.style
         control = await asyncio.to_thread(
-            control_image, folder, view, design.views[view], style, self.catalog, self.settings.templates_dir
+            compose_control, folder, view, design.views[view], style, self.catalog, self.settings.templates_dir
         )
-        control_png = to_png(control)
-        (folder / f"control_{view}.png").write_bytes(control_png)  # kept for debugging
+        control_png, check_png = await asyncio.to_thread(control_files, control)
+        (folder / f"control_{view}.png").write_bytes(control_png)
+        # Placement check for every job: GET /api/jobs/{job}/{view}/check.png
+        (folder / f"check_{render.id}_{view}.png").write_bytes(check_png)
         lines_name = await self.comfy.upload_image(control_png, f"fashion_{render.id}_{view}.png")
 
         depth_name = None

@@ -79,3 +79,10 @@ def test_check_ids_and_validation() -> None:
         style(fabric="velvet").check_ids(CATALOG)
     with pytest.raises(ValidationError):
         style(custom_hex="tan")
+
+
+def test_mannequin_scenes_say_the_garment_is_worn() -> None:
+    for scene in ("light_room", "plain_studio"):
+        prompt = build_prompt(CATALOG, style(scene=scene), "front")
+        assert "fully dressed, wearing the garment, never shown nude" in prompt
+    assert "nude" not in build_prompt(CATALOG, style(scene="product_shot"), "front")

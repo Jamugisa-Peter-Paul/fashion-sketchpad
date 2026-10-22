@@ -28,7 +28,8 @@ def test_depth_controlnet_is_chained_after_lines() -> None:
     wf = build_workflow("p", "lines.png", 1, RenderSettings(), depth_image="depth.png")
     depth = wf["15"]["inputs"]
     assert depth["positive"] == ["9", 0] and depth["negative"] == ["9", 1] and depth["image"] == ["14", 0]
-    assert (depth["strength"], depth["end_percent"]) == (0.4, 0.5)
+    assert (depth["strength"], depth["end_percent"]) == (0.3, 0.4)  # light, so the garment lines win
+    assert (wf["9"]["inputs"]["strength"], wf["9"]["inputs"]["end_percent"]) == (0.85, 0.85)
     assert wf["11"]["inputs"]["positive"] == ["15", 0] and wf["11"]["inputs"]["negative"] == ["15", 1]
     assert validate(wf, {"lines.png": b"", "depth.png": b""}) == []
 

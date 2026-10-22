@@ -96,6 +96,8 @@ stitching:
   - { id: contrast, label: Contrast, prompt: "contrast topstitching" }
 
 # {garment} = full garment description, {mannequin} = finish + body, e.g. "matte dark grey slim female".
+# On-mannequin scenes say the mannequin wears the garment: without it a weak garment control can give a bare
+# mannequin. Flux has no negative prompt (cfg 1), so if "nude" ever pulls renders the wrong way, drop those words.
 scenes:
   - id: light_room
     label: Light Room
@@ -103,7 +105,7 @@ scenes:
     on_mannequin: true
     prompt: >-
       Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
-      standing straight, full body from head to feet, in a bright minimalist studio with a large window on the
+      standing straight and fully dressed, wearing the garment, never shown nude, full body from head to feet, in a bright minimalist studio with a large window on the
       left, soft natural daylight casting window shadows on the light grey wall and polished floor, exact garment
       construction, crisp seams and stitching, realistic fabric texture, high-end fashion lookbook
   - id: plain_studio
@@ -111,7 +113,7 @@ scenes:
     on_mannequin: true
     prompt: >-
       Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
-      standing straight, full body from head to feet, plain light grey seamless studio background, soft even
+      standing straight and fully dressed, wearing the garment, never shown nude, full body from head to feet, plain light grey seamless studio background, soft even
       studio lighting, exact garment construction, crisp seams and stitching, realistic fabric texture,
       high-end fashion lookbook
   - id: product_shot

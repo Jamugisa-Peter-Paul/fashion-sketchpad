@@ -79,8 +79,8 @@ sudo chown root:dct /etc/fashion-gateway.env && sudo chmod 640 /etc/fashion-gate
 ```
 
 Optional render overrides (defaults are the proven recipe): `RENDER_STEPS=28`, `RENDER_GUIDANCE=3.5`,
-`LINES_STRENGTH=0.85`, `LINES_END=0.85`, `DEPTH_STRENGTH=0.4` (0 turns off the body-shape ControlNet),
-`DEPTH_END=0.5`, `VIEW_HINT=1`.
+`LINES_STRENGTH=0.85`, `LINES_END=0.85`, `DEPTH_STRENGTH=0.3` (0 turns off the body-shape ControlNet),
+`DEPTH_END=0.4`, `VIEW_HINT=1`.
 
 ## 4. systemd service
 
@@ -103,9 +103,16 @@ chmod +x ~/fashion-sketchpad/deploy/smoke.sh
 ~/fashion-sketchpad/deploy/smoke.sh http://127.0.0.1:8190 "$TOKEN"
 ```
 
-`smoke.sh` cleans the sample sketch, renders it on `female_slim`, and saves the result to
-`/tmp/fashion-smoke-render.png`, which takes about 60 s on the GPU. Copy that file to Windows to look at
-it: `scp dct@10.4.18.27:/tmp/fashion-smoke-render.png .`
+`smoke.sh` cleans the sample sketch and renders it on `female_slim` as a camel tan cotton twill shirt,
+which takes about 60 s on the GPU. It prints the exact prompt sent to ComfyUI and saves two files:
+
+- `/tmp/fashion-smoke-check.png`: the placement check. Red is the sketch as placed, blue lines are
+  neck/shoulders/waist/hips, and the green bar is the body's shoulder width. The collar should touch the
+  neck line and the shoulders should span the green bar.
+- `/tmp/fashion-smoke-render.png`: the render.
+
+Copy them to Windows to look at them: `scp dct@10.4.18.27:/tmp/fashion-smoke-*.png .` Every job writes
+the same check image, and you can fetch it for any render from `GET /api/jobs/<job_id>/<view>/check.png`.
 
 ## 5. Cloudflare tunnel
 

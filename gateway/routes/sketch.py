@@ -87,7 +87,7 @@ def clean(
         template = find_view(state.settings.templates_dir, body, view)
         landmarks = landmarks_from_mask(load_mask(template.mask)) if template.mask else default_landmarks()
         kind = "figure" if whole_body else garment_item.placement
-        placement = suggest_placement(width, height, kind, landmarks)
+        placement = suggest_placement(crop, kind, landmarks)
 
     clean_id, folder = state.storage.new_upload_dir()
     picture.thumbnail((SKETCH_MAX_SIDE, SKETCH_MAX_SIDE))
