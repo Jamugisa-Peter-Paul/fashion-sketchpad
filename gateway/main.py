@@ -2,23 +2,47 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import httpx
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway import __version__
 from gateway.catalog import load_catalog
+from gateway.comfy import ComfyClient
 from gateway.config import Settings
+from gateway.designs import DesignStore
+from gateway.jobs import RenderQueue
 from gateway.routes import catalog as catalog_routes
+from gateway.routes import designs as designs_routes
+from gateway.routes import jobs as jobs_routes
 from gateway.routes import sketch as sketch_routes
 from gateway.storage import Storage
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+
+def create_app(settings: Settings | None = None, comfy_transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
+    """`comfy_transport` lets tests point the ComfyUI client at the in-process fake."""
     settings = settings or Settings.from_env()
-    app = FastAPI(title="Fashion Sketchpad gateway", version=__version__)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.storage = Storage(settings.data_dir)
+        app.state.designs = DesignStore(app.state.storage.designs)
+        app.state.comfy = ComfyClient(settings.comfy_url, transport=comfy_transport)
+        app.state.queue = RenderQueue(app.state.designs, app.state.comfy, app.state.catalog, settings)
+        app.state.queue.start()
+        yield
+        await app.state.queue.stop()
+        await app.state.comfy.close()
+
+    app = FastAPI(title="Fashion Sketchpad gateway", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.catalog = load_catalog()
-    app.state.storage = Storage(settings.data_dir)
 
     app.add_middleware(
         CORSMiddleware,
@@ -28,10 +52,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     @app.get("/api/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok", "version": __version__}
+    async def health(request: Request) -> dict[str, str]:
+        comfy_ok = await request.app.state.comfy.ping()
+        return {"status": "ok", "version": __version__, "comfy": "ok" if comfy_ok else "unreachable"}
 
     app.include_router(catalog_routes.router)
     app.include_router(sketch_routes.router)
+    app.include_router(jobs_routes.router)
+    app.include_router(designs_routes.router)
     return app
-

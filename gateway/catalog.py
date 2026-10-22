@@ -60,6 +60,9 @@ class Catalog(BaseModel):
     def scene(self, item_id: str) -> Scene:
         return cast(Scene, self.find("scenes", item_id))
 
+    def colour(self, item_id: str) -> Colour:
+        return cast(Colour, self.find("colours", item_id))
+
 
 class BodyStatus(Body):
     views: list[str]

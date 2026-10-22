@@ -72,7 +72,7 @@ colours:
 
 # {colour} is replaced with the colour wording, e.g. "camel tan (#C2A878)".
 prints:
-  - { id: plain, label: Plain, prompt: "plain {colour}" }
+  - { id: plain, label: Plain, prompt: "{colour}" }
   - { id: kitenge, label: Kitenge / wax, prompt: "bold African kitenge wax print with a dominant {colour} pattern" }
   - { id: stripes, label: Stripes, prompt: "{colour} and white striped" }
   - { id: checks, label: Checks, prompt: "{colour} checked" }

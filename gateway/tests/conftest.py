@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from gateway.config import Settings
+from gateway.config import RenderSettings, Settings
 from gateway.main import create_app
+from gateway.tools.fake_comfy import create_fake_comfy
 
 TOKEN = "test-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -38,10 +41,17 @@ def settings(tmp_path: Path, templates_dir: Path) -> Settings:
         templates_dir=templates_dir,
         data_dir=tmp_path / "data",
         app_tokens=[TOKEN, "second-token"],
+        render=RenderSettings(poll_interval_s=0.01, view_timeout_s=10),
     )
 
 
 @pytest.fixture
-def client(settings: Settings) -> TestClient:
-    with TestClient(create_app(settings)) as test_client:
+def fake_comfy() -> FastAPI:
+    return create_fake_comfy(seconds=0.0)
+
+
+@pytest.fixture
+def client(settings: Settings, fake_comfy: FastAPI) -> TestClient:
+    app = create_app(settings, comfy_transport=httpx.ASGITransport(app=fake_comfy))
+    with TestClient(app) as test_client:
         yield test_client

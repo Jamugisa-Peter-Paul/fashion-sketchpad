@@ -18,6 +18,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from gateway.auth import require_token
+from gateway.models import PlacementModel
 from gateway.placement import default_landmarks, landmarks_from_mask, load_mask, suggest_placement
 from gateway.routes import read_upload
 from gateway.sketch import (
@@ -27,7 +28,6 @@ from gateway.sketch import (
     SketchError,
     clean_drawn,
     clean_paper,
-    crop_to_content,
     decode_image,
     product_shot_placement,
     to_png,
@@ -38,15 +38,6 @@ from gateway.templates import find_view
 router = APIRouter(prefix="/api/sketch", dependencies=[Depends(require_token)])
 
 SKETCH_MAX_SIDE = 2048  # stored copy of the original, for the gallery
-
-
-class PlacementModel(BaseModel):
-    cx: float
-    cy: float
-    scale: float
-
-    def to_placement(self) -> Placement:
-        return Placement(self.cx, self.cy, self.scale)
 
 
 class CleanResponse(BaseModel):
@@ -81,19 +72,17 @@ def clean(
     data = read_upload(image, state.settings.max_upload_mb)
     try:
         picture = decode_image(data)
-        if source == "paper":
-            crop = clean_paper(picture).lines
-        else:
-            lines = clean_drawn(picture)
-            crop = lines if scene_item.on_mannequin else crop_to_content(lines)
+        # Drawn sketches keep the full canvas so they stay aligned with the guide; the product-shot crop
+        # happens at render time, so switching scenes later still works.
+        crop = clean_paper(picture).lines if source == "paper" else clean_drawn(picture)
     except SketchError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     height, width = crop.shape
-    if not scene_item.on_mannequin:
+    if source == "drawn":
+        placement = Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0)
+    elif not scene_item.on_mannequin:
         placement = product_shot_placement(width, height)
-    elif source == "drawn":
-        placement = Placement(CANVAS_W / 2, CANVAS_H / 2, 1.0)  # drawn on the guide: already aligned
     else:
         template = find_view(state.settings.templates_dir, body, view)
         landmarks = landmarks_from_mask(load_mask(template.mask)) if template.mask else default_landmarks()

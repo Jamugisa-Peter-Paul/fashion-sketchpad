@@ -51,10 +51,17 @@ as blob URLs. Tokens never go into URLs.
 | GET | `/api/templates/{body}/{view}/guide.png` | Faint body outline to draw over |
 | POST | `/api/sketch/clean` | Image + source (`paper`/`drawn`) + scene/garment/body/view ─► `{clean_id, width, height, placement, lines_url, overlay_url}` |
 | GET | `/api/sketch/{clean_id}/lines.png`, `/overlay.png` | Cleaned crop: white-on-black (model input) / dark-on-transparent (for the editor) |
-| POST | `/api/generate` | Sketches + options ─► `{job_id, design_id}` |
-| GET | `/api/jobs/{id}` | Status per view, queue position, image URLs |
+| POST | `/api/generate` | JSON `{design_id?, title?, style, views: {front: {clean_id, placement?}}, seed?}` ─► 202 `{job_id, design_id}` |
+| GET | `/api/jobs/{id}` | `{status, seed, position, eta_seconds, views: {front: {status, error, image_url}}}` |
 | GET | `/api/jobs/{id}/{view}.png` | Render |
-| GET/DELETE | `/api/designs`, `/api/designs/{id}` | Gallery |
+| GET | `/api/designs` | Gallery summaries with thumbnail URL |
+| GET/PATCH/DELETE | `/api/designs/{id}` | Full design with render history / rename / delete |
+| GET | `/api/designs/{id}/{sketch\|lines}/{view}.png` | Stored sketch and cleaned lines, for "Edit sketch" |
+
+`style` is `StyleOptions` in `gateway/prompts.py`: catalog ids for garment, body, colour (or
+`custom_hex`), print, fabric, fit, buttons, stitching, scene, finish, plus `notes`. *New variation*
+posts the same style with no seed. *Change colour* posts a new style with the seed of the render it
+changes. For an existing design, `views` may be empty, which reuses the stored sketches.
 
 **Templates** are found on disk, not configured:
 `TEMPLATES_DIR/<body>/<view>_{guide,mask}.png` and `<view>_{photo,depth}_*.png`. A view is *available*
@@ -84,8 +91,13 @@ appear in the catalog with `available: false`, so the app can show them as "not 
    on the lines image (strength 0.85, end 0.85), EmptySD3LatentImage 832×1216, KSampler euler/simple
    with 28 steps and cfg 1. For on-mannequin scenes drawn on a template, a second ControlNet uses the body
    depth image (strength ≈0.4, end ≈0.5). This is off for product shots.
-4. **Queue.** One worker submits views one after another (`/upload/image`, `/prompt`, poll
-   `/history/{id}`, `/view`) and copies results into the design folder. Expect about 60 s per view.
+4. **Queue** (`gateway/jobs.py`). One worker submits views one after another (`/upload/image`,
+   `/prompt`, poll `/history/{id}`, `/view`) and copies results into the design folder. Expect about
+   60 s per view. The ComfyUI `prompt_id` is saved, so after a gateway restart a view ComfyUI still
+   knows about is collected, not rendered again.
+
+Render settings (steps, guidance, ControlNet strengths, the "Back view." hint) default to the proven
+recipe and can be overridden with env vars. See `RenderSettings` in `gateway/config.py`.
 
 ### Data on disk
 
@@ -94,7 +106,8 @@ DATA_DIR/uploads/<clean_id>/   sketch.png, lines.png, meta.json (deleted after 3
 DATA_DIR/designs/<design_id>/
   design.json            choices, input method, body, garment, render history
   sketch_<view>.png      what the user drew / uploaded (normalised)
-  lines_<view>.png       cleaned control image sent to ComfyUI
+  lines_<view>.png       cleaned lines crop (full canvas for drawn sketches)
+  control_<view>.png     last 832x1216 control image sent to ComfyUI (for debugging)
   render_<job_id>_<view>.png
 ```
 

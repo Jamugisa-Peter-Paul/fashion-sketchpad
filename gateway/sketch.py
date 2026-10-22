@@ -207,8 +207,8 @@ def clean_paper(image: Image.Image, params: PaperParams = PaperParams()) -> Clea
     keep = garment_mask(ink, params.cluster_gap, sheet)
     ink[~keep] = 0
     x0, y0, x1, y1 = bounding_box(keep, params.margin)
-    source_box = tuple(round(v / scale) for v in (x0, y0, x1, y1))
-    return CleanResult(lines=ink[y0:y1, x0:x1].copy(), bbox=source_box)  # type: ignore[arg-type]
+    source_box = (round(x0 / scale), round(y0 / scale), round(x1 / scale), round(y1 / scale))
+    return CleanResult(lines=ink[y0:y1, x0:x1].copy(), bbox=source_box)
 
 
 # --- drawn in app ----------------------------------------------------------------------------------------
