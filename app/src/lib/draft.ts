@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import type { Catalog, Group, Placement, StyleOptions, ViewName } from "./types";
 import { defaultId } from "./catalog";
+import { hasInk } from "./strokes";
 
 // The design being worked on. Persisted to IndexedDB after every change, so closing the app (or a crash)
 // never loses a sketch. Photo blobs live under their own keys (see photoKey) because they aren't JSON.
@@ -129,10 +130,9 @@ export const useDraft = create<DraftState & DraftActions>()(
       },
       hasContent: () => {
         const s = getState();
-        return (
-          Object.values(s.drawn).some((v) => v && (v.strokes.length > 0 || v.base)) ||
-          Object.values(s.paper).some((v) => v?.cleanId)
-        );
+        return s.method === "draw"
+          ? Object.values(s.drawn).some((v) => hasInk(v))
+          : Object.values(s.paper).some((v) => v?.cleanId);
       },
     }),
     // skipHydration: IndexedDB only exists in the browser; AuthGate calls rehydrate() on mount.
