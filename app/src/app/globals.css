@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #f7f5f2;
+  --color-surface: #ffffff;
+  --color-ink: #1c1b19;
+  --color-muted: #6b6760;
+  --color-line: #e6e1da;
+  --color-accent: #b4532a;
+  --color-accent-strong: #96431f;
+  --color-accent-soft: #f5e6dc;
+  --color-danger: #b42318;
+  --color-ok: #2f7d4f;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Android edge-to-edge: keep content clear of the status and navigation bars. */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+/* Drawing surfaces must never scroll or zoom the page. */
+.no-touch-scroll {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

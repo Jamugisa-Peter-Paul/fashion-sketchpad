@@ -51,6 +51,13 @@ def test_guide_png(client: TestClient) -> None:
     assert missing.status_code == 404
 
 
+def test_template_photo_thumbnail(client: TestClient) -> None:
+    response = client.get("/api/templates/female_slim/front/photo.jpg", headers=AUTH)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert client.get("/api/templates/male_slim/front/photo.jpg", headers=AUTH).status_code == 404
+
+
 def test_guide_rejects_unknown_body(client: TestClient) -> None:
     for body in ("%2E%2E", "not_a_body"):
         response = client.get(f"/api/templates/{body}/front/guide.png", headers=AUTH)
