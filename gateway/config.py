@@ -30,15 +30,25 @@ class RenderSettings:
     controlnet: str = "flux-union-pro-2/diffusion_pytorch_model.safetensors"
     steps: int = 28  # [RENDER_STEPS]
     guidance: float = 3.5  # [RENDER_GUIDANCE]
-    lines_strength: float = 0.85  # [LINES_STRENGTH]
-    lines_end: float = 0.85  # [LINES_END]
-    # Body-shape ControlNet, only used on a body template. Kept light so it shapes the mannequin without
-    # overpowering the garment lines (at 0.4 / 0.5 it rendered a bare mannequin under a too-small garment).
-    depth_strength: float = 0.3  # [DEPTH_STRENGTH] 0 disables it
-    depth_end: float = 0.4  # [DEPTH_END]
+    # Sketch-lines ControlNet. Too strong or too long and Flux copies the lines literally (black outlines,
+    # flat colour fill); paper sketches are rougher, so they are held more loosely than drawn ones.
+    paper_lines_strength: float = 0.7  # [PAPER_LINES_STRENGTH]
+    paper_lines_end: float = 0.6  # [PAPER_LINES_END]
+    drawn_lines_strength: float = 0.8  # [DRAWN_LINES_STRENGTH]
+    drawn_lines_end: float = 0.7  # [DRAWN_LINES_END]
+    # Body-shape ControlNet from the template depth, on-mannequin scenes only. The templates are mannequins,
+    # so this is what brings the mannequin's shape and pose through.
+    depth_strength: float = 0.6  # [DEPTH_STRENGTH] 0 disables it
+    depth_end: float = 0.7  # [DEPTH_END]
     view_hint: bool = True  # [VIEW_HINT] prefix "Back view." / "Side view." to non-front prompts
     view_timeout_s: int = 600  # give up on a view after this long
     poll_interval_s: float = 1.0
+
+    def lines_for(self, source: str) -> tuple[float, float]:
+        """(strength, end_percent) of the sketch-lines ControlNet for a paper or drawn sketch."""
+        if source == "paper":
+            return self.paper_lines_strength, self.paper_lines_end
+        return self.drawn_lines_strength, self.drawn_lines_end
 
     @classmethod
     def from_env(cls) -> RenderSettings:
@@ -46,8 +56,10 @@ class RenderSettings:
         return cls(
             steps=int(env.get("RENDER_STEPS", cls.steps)),
             guidance=float(env.get("RENDER_GUIDANCE", cls.guidance)),
-            lines_strength=float(env.get("LINES_STRENGTH", cls.lines_strength)),
-            lines_end=float(env.get("LINES_END", cls.lines_end)),
+            paper_lines_strength=float(env.get("PAPER_LINES_STRENGTH", cls.paper_lines_strength)),
+            paper_lines_end=float(env.get("PAPER_LINES_END", cls.paper_lines_end)),
+            drawn_lines_strength=float(env.get("DRAWN_LINES_STRENGTH", cls.drawn_lines_strength)),
+            drawn_lines_end=float(env.get("DRAWN_LINES_END", cls.drawn_lines_end)),
             depth_strength=float(env.get("DEPTH_STRENGTH", cls.depth_strength)),
             depth_end=float(env.get("DEPTH_END", cls.depth_end)),
             view_hint=env.get("VIEW_HINT", "1").lower() not in ("0", "false", "no"),

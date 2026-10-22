@@ -95,27 +95,33 @@ stitching:
   - { id: tonal, label: Tonal, prompt: "tonal stitching" }
   - { id: contrast, label: Contrast, prompt: "contrast topstitching" }
 
-# {garment} = full garment description, {mannequin} = finish + body, e.g. "matte dark grey slim female".
-# On-mannequin scenes say the mannequin wears the garment: without it a weak garment control can give a bare
-# mannequin. Flux has no negative prompt (cfg 1), so if "nude" ever pulls renders the wrong way, drop those words.
+# Placeholders: {garment} = full garment description, {finish} = mannequin finish ("matte dark grey"),
+# {figure} = body type ("slim female"); {mannequin} = "{finish} {figure}" is also available.
+# The body templates are mannequins, and their depth map (DEPTH_STRENGTH) brings the mannequin's shape and pose
+# through. On-mannequin scenes say the mannequin wears the garment: without it the garment can come out as a
+# flat drawing on a stand. Flux has no negative prompt (cfg 1), so if "nude" ever pulls renders the wrong way,
+# drop those words.
 scenes:
   - id: light_room
     label: Light Room
     default: true
     on_mannequin: true
     prompt: >-
-      Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
-      standing straight and fully dressed, wearing the garment, never shown nude, full body from head to feet, in a bright minimalist studio with a large window on the
-      left, soft natural daylight casting window shadows on the light grey wall and polished floor, exact garment
-      construction, crisp seams and stitching, realistic fabric texture, high-end fashion lookbook
+      Photorealistic fashion product photograph of a faceless {finish} fashion mannequin wearing the garment,
+      {garment}. A faceless sculpted mannequin with a {figure} figure standing straight, the garment fully
+      dressed on the mannequin, never shown nude, full body from head to feet, in a bright minimalist studio
+      with a large window on the left, natural daylight casting crisp window-frame shadows on the light grey
+      wall and polished floor, exact garment construction, crisp seams and stitching, realistic fabric texture,
+      high-end fashion lookbook
   - id: plain_studio
     label: Plain studio
     on_mannequin: true
     prompt: >-
-      Photorealistic fashion product photograph of {garment}, displayed on a faceless {mannequin} mannequin
-      standing straight and fully dressed, wearing the garment, never shown nude, full body from head to feet, plain light grey seamless studio background, soft even
-      studio lighting, exact garment construction, crisp seams and stitching, realistic fabric texture,
-      high-end fashion lookbook
+      Photorealistic fashion product photograph of a faceless {finish} fashion mannequin wearing the garment,
+      {garment}. A faceless sculpted mannequin with a {figure} figure standing straight, the garment fully
+      dressed on the mannequin, never shown nude, full body from head to feet, plain light grey seamless studio
+      background, soft even studio lighting, exact garment construction, crisp seams and stitching, realistic
+      fabric texture, high-end fashion lookbook
   - id: product_shot
     label: Product shot
     on_mannequin: false

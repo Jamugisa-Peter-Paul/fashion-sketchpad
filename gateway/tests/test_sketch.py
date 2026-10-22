@@ -146,3 +146,16 @@ def test_place_on_canvas_clips_off_canvas_parts() -> None:
     assert canvas[:50, :50].all() and not canvas[60:, 60:].any()
     with pytest.raises(SketchError):
         place_on_canvas(crop, Placement(cx=-500, cy=-500, scale=1.0))
+
+
+def test_place_on_canvas_keeps_lines_crisp() -> None:
+    """Enlarging must not ring (cubic overshoot) and faint grey must not reach the ControlNet."""
+    crop = np.zeros((60, 60), np.uint8)
+    crop[28:32, 10:50] = 255  # a line
+    crop[5:8, 5:55] = 25  # faint paper texture
+    canvas = place_on_canvas(crop, Placement(cx=416, cy=608, scale=4.0))
+    values = np.unique(canvas)
+    assert values.min() == 0 and values.max() == 255
+    assert not ((canvas > 0) & (canvas < 40)).any()
+    ys, _ = np.nonzero(canvas)
+    assert ys.min() > 608 - 120 + 5 * 4  # the faint strip at the top was dropped

@@ -91,11 +91,17 @@ appear in the catalog with `available: false`, so the app can show them as "not 
    its `clean_id` plus the final placement, so images are uploaded only once.
 2. **Prompt.** Scene template + garment description built from the catalog. Front and back use the same
    seed and identical colour and fabric wording. Explicit colour names with hex reduce drift.
-3. **Workflow.** UnetLoaderGGUF + DualCLIPLoader(flux) + VAE, FluxGuidance 3.5, ControlNet Union Pro 2.0
-   on the lines image (strength 0.85, end 0.85), EmptySD3LatentImage 832×1216, KSampler euler/simple
-   with 28 steps and cfg 1. For on-mannequin scenes drawn on a template, a second ControlNet uses the body
-   depth image at strength 0.3, end 0.4, kept light so it can't overpower the garment lines. This is
-   off for product shots. On-mannequin prompts also say the mannequin is fully dressed in the garment.
+3. **Workflow** (`gateway/workflow.py`). Pure text-to-image: KSampler (euler/simple, 28 steps, cfg 1,
+   denoise 1.0) starts from an EmptySD3LatentImage at 832×1216. Nothing from the sketch is encoded into
+   the latent or blended into the result. The sketch (white lines on black) is only a ControlNet Union
+   Pro 2.0 hint: strength 0.7 / end 0.6 for paper sketches, 0.8 / 0.7 for drawn ones (stronger or longer
+   and Flux copies the lines as black outlines with a flat fill). Enlarged sketches use linear
+   interpolation, and grey below 40 is dropped, so no soft fringe reaches the ControlNet. In on-mannequin
+   scenes a second ControlNet uses the mannequin template's depth at strength 0.6 / end 0.7 for the
+   mannequin's shape and pose; it's off for product shots. On-mannequin prompts start with "a faceless
+   matte dark grey fashion mannequin wearing the garment" (the finish follows the user's choice).
+   FluxGuidance 3.5. A test (`gateway/tests/workflow_checks.py`) asserts the images only feed
+   ControlNet inputs.
 4. **Queue** (`gateway/jobs.py`). One worker submits views one after another (`/upload/image`,
    `/prompt`, poll `/history/{id}`, `/view`) and copies results into the design folder. Expect about
    60 s per view. The ComfyUI `prompt_id` is saved, so after a gateway restart a view ComfyUI still
@@ -115,6 +121,8 @@ DATA_DIR/designs/<design_id>/
   control_<view>.png     last 832x1216 control image sent to ComfyUI
   check_<job_id>_<view>.png  placement check: control lines over the template with neck/shoulder/waist/hip
                          lines (GET /api/jobs/{id}/{view}/check.png)
+  workflow_<job_id>_<view>.json  exact ComfyUI workflow queued (GET /api/jobs/{id}/{view}/workflow.json)
+  prompt_<job_id>_<view>.txt     final prompt text
   render_<job_id>_<view>.png
 ```
 

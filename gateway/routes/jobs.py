@@ -129,3 +129,13 @@ def job_check_image(request: Request, job_id: str, view: View) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="Check image not ready")
     return FileResponse(path, media_type="image/png")
+
+
+@router.get("/jobs/{job_id}/{view}/workflow.json")
+def job_workflow(request: Request, job_id: str, view: View) -> FileResponse:
+    """The exact ComfyUI workflow (API format, prompt included) that was queued for this view."""
+    design, _ = _load_job(request, job_id)
+    path = request.app.state.designs.folder(design.id) / f"workflow_{job_id}_{view}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workflow not submitted yet")
+    return FileResponse(path, media_type="application/json")

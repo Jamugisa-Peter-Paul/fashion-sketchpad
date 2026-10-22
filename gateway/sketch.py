@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 CANVAS_W, CANVAS_H = 832, 1216
+LINE_FLOOR = 40  # control-image values below this are set to black
 WORK_LONG_SIDE = 1216
 MAX_SOURCE_PIXELS = 40_000_000
 
@@ -248,8 +249,11 @@ def place_on_canvas(crop: np.ndarray, placement: Placement) -> np.ndarray:
         raise SketchError("Placement scale must be positive")
     h, w = crop.shape
     new_w, new_h = max(round(w * placement.scale), 1), max(round(h * placement.scale), 1)
-    interp = cv2.INTER_AREA if placement.scale < 1 else cv2.INTER_CUBIC
+    # Linear, not cubic, when enlarging: cubic overshoots and leaves a faint ring around every line.
+    interp = cv2.INTER_AREA if placement.scale < 1 else cv2.INTER_LINEAR
     scaled = cv2.resize(crop, (new_w, new_h), interpolation=interp)
+    # Only clear lines reach the ControlNet: faint grey (paper texture, soft pencil edges) is dropped.
+    scaled[scaled < LINE_FLOOR] = 0
 
     canvas = np.zeros((CANVAS_H, CANVAS_W), np.uint8)
     left, top = round(placement.cx - new_w / 2), round(placement.cy - new_h / 2)

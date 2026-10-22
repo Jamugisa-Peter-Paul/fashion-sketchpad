@@ -17,8 +17,15 @@ def build_workflow(
     render: RenderSettings,
     depth_image: str | None = None,
     filename_prefix: str = "fashion/render",
+    source: str = "drawn",
 ) -> dict[str, Any]:
-    """`lines_image` / `depth_image` are names returned by ComfyUI's /upload/image."""
+    """Pure text-to-image: KSampler starts from an empty latent (denoise 1.0). The sketch (white lines on
+    black) and the body depth are only ControlNet hints; no image is encoded into the latent or blended in.
+
+    `lines_image` / `depth_image` are names returned by ComfyUI's /upload/image. `source` ("paper" or
+    "drawn") picks the sketch ControlNet strength.
+    """
+    lines_strength, lines_end = render.lines_for(source)
     workflow: dict[str, Any] = {
         "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": render.unet}},
         "2": {
@@ -39,9 +46,9 @@ def build_workflow(
                 "control_net": ["7", 0],
                 "image": ["8", 0],
                 "vae": ["3", 0],
-                "strength": render.lines_strength,
+                "strength": lines_strength,
                 "start_percent": 0.0,
-                "end_percent": render.lines_end,
+                "end_percent": lines_end,
             },
         },
         "10": {

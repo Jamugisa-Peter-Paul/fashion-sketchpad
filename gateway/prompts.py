@@ -110,6 +110,9 @@ def garment_description(catalog: Catalog, style: StyleOptions) -> str:
 
 def build_prompt(catalog: Catalog, style: StyleOptions, view: str, view_hint: bool = True) -> str:
     scene = catalog.scene(style.scene)
-    mannequin = f"{catalog.find('mannequin_finishes', style.finish).prompt} {catalog.find('bodies', style.body).prompt}"
-    prompt = scene.prompt.format(garment=garment_description(catalog, style), mannequin=mannequin)
+    finish = catalog.find("mannequin_finishes", style.finish).prompt
+    figure = catalog.find("bodies", style.body).prompt
+    prompt = scene.prompt.format(
+        garment=garment_description(catalog, style), finish=finish, figure=figure, mannequin=f"{finish} {figure}"
+    )
     return (VIEW_HINTS.get(view, "") if view_hint else "") + prompt

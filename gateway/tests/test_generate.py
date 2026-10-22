@@ -19,6 +19,7 @@ from gateway.models import Design, Render, RenderView
 from gateway.sketch import CANVAS_H, CANVAS_W
 from gateway.storage import write_json
 from gateway.tests.conftest import AUTH
+from gateway.tests.workflow_checks import assert_pure_text_to_image
 
 SAMPLES = Path(__file__).parent / "samples"
 STYLE = {"garment": "shirt", "body": "female_slim", "colour": "camel", "fabric": "cotton_twill"}
@@ -55,7 +56,7 @@ def submitted_prompts(fake: FastAPI) -> list[dict[str, Any]]:
     return [p.workflow for p in fake.state.fake.prompts.values()]
 
 
-def test_front_and_back_render_with_same_seed(client: TestClient, fake_comfy: FastAPI) -> None:
+def test_front_and_back_render_with_same_seed(client: TestClient, fake_comfy: FastAPI, settings: Settings) -> None:
     views = {
         "front": {"clean_id": clean(client, "shirt_front_paper.jpeg")},
         "back": {"clean_id": clean(client, "shirt_back_paper.jpeg", view="back")},
@@ -76,6 +77,17 @@ def test_front_and_back_render_with_same_seed(client: TestClient, fake_comfy: Fa
     front_prompt, back_prompt = (wf["4"]["inputs"]["text"] for wf in workflows)
     assert back_prompt == "Back view. " + front_prompt
     assert "15" in workflows[0]  # body depth ControlNet is used on the template
+
+    # Pure text-to-image with paper-sketch strengths; the exact workflow and prompt are kept per job.
+    for view, workflow in zip(("front", "back"), workflows):
+        assert_pure_text_to_image(workflow)
+        assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.7, 0.6)
+        assert (workflow["15"]["inputs"]["strength"], workflow["15"]["inputs"]["end_percent"]) == (0.6, 0.7)
+        saved = client.get(f"/api/jobs/{ids['job_id']}/{view}/workflow.json", headers=AUTH)
+        assert saved.status_code == 200 and saved.json() == workflow
+        design_dir = settings.data_dir / "designs" / ids["design_id"]
+        prompt_file = design_dir / f"prompt_{ids['job_id']}_{view}.txt"
+        assert prompt_file.read_text(encoding="utf-8").strip() == workflow["4"]["inputs"]["text"]
 
     # A placement check image is written for every job and view.
     for view in ("front", "back"):
@@ -186,3 +198,23 @@ def test_unfinished_jobs_resume_after_restart(settings: Settings, fake_comfy: Fa
 
 def test_health_reports_comfy(client: TestClient) -> None:
     assert client.get("/api/health").json()["comfy"] == "ok"
+
+
+def test_drawn_sketch_uses_drawn_strengths(client: TestClient, fake_comfy: FastAPI) -> None:
+    drawing = np.full((CANVAS_H, CANVAS_W), 255, np.uint8)
+    drawing[300:302, 300:520] = 0
+    drawing[300:800, 300:302] = 0
+    buffer = io.BytesIO()
+    Image.fromarray(drawing).save(buffer, format="PNG")
+    response = client.post(
+        "/api/sketch/clean", headers=AUTH, files={"image": ("d.png", buffer.getvalue(), "image/png")}, data={"source": "drawn"}
+    )
+    ids = generate(client, views={"front": {"clean_id": response.json()["clean_id"]}})
+    wait_for_job(client, ids["job_id"])
+    workflow = submitted_prompts(fake_comfy)[0]
+    assert_pure_text_to_image(workflow)
+    assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.8, 0.7)
+
+
+def test_workflow_json_404_before_submission(client: TestClient) -> None:
+    assert client.get("/api/jobs/0123456789abcdef/front/workflow.json", headers=AUTH).status_code == 404

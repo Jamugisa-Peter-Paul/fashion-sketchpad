@@ -78,9 +78,14 @@ EOF
 sudo chown root:dct /etc/fashion-gateway.env && sudo chmod 640 /etc/fashion-gateway.env
 ```
 
-Optional render overrides (defaults are the proven recipe): `RENDER_STEPS=28`, `RENDER_GUIDANCE=3.5`,
-`LINES_STRENGTH=0.85`, `LINES_END=0.85`, `DEPTH_STRENGTH=0.3` (0 turns off the body-shape ControlNet),
-`DEPTH_END=0.4`, `VIEW_HINT=1`.
+Optional render overrides (the defaults are shown): `RENDER_STEPS=28`, `RENDER_GUIDANCE=3.5`,
+`PAPER_LINES_STRENGTH=0.7`, `PAPER_LINES_END=0.6`, `DRAWN_LINES_STRENGTH=0.8`, `DRAWN_LINES_END=0.7`,
+`DEPTH_STRENGTH=0.6` (0 turns off the mannequin-shape ControlNet), `DEPTH_END=0.7`, `VIEW_HINT=1`.
+The old `LINES_STRENGTH` / `LINES_END` variables are no longer read.
+
+To see exactly what a render was given, fetch
+`GET /api/jobs/<job_id>/<view>/workflow.json` (ComfyUI API format, prompt included) or read
+`prompt_<job_id>_<view>.txt` in the design folder.
 
 ## 4. systemd service
 

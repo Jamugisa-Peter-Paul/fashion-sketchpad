@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -236,6 +237,16 @@ class RenderQueue:
 
         prompt = build_prompt(self.catalog, style, view, self.settings.render.view_hint)
         workflow = build_workflow(
-            prompt, lines_name, render.seed, self.settings.render, depth_name, filename_prefix=f"fashion/{render.id}_{view}"
+            prompt,
+            lines_name,
+            render.seed,
+            self.settings.render,
+            depth_name,
+            filename_prefix=f"fashion/{render.id}_{view}",
+            source=design.views[view].source,
         )
+        # Exactly what ComfyUI gets, for debugging: GET /api/jobs/{job}/{view}/workflow.json. The file is
+        # ComfyUI's API format, so it can also be queued by hand (POST /prompt) to reproduce a render.
+        (folder / f"workflow_{render.id}_{view}.json").write_text(json.dumps(workflow, indent=2), encoding="utf-8")
+        (folder / f"prompt_{render.id}_{view}.txt").write_text(prompt + "\n", encoding="utf-8")
         return await self.comfy.queue_prompt(workflow), prompt

@@ -22,9 +22,13 @@ def test_garment_description_reads_naturally() -> None:
 
 def test_light_room_prompt_matches_proven_recipe() -> None:
     prompt = build_prompt(CATALOG, style(), "front")
-    assert prompt.startswith("Photorealistic fashion product photograph of a regular fit camel tan (#C2A878)")
-    assert "displayed on a faceless matte dark grey slim female mannequin standing straight" in prompt
-    assert "large window on the left" in prompt and prompt.endswith("high-end fashion lookbook")
+    assert prompt.startswith(
+        "Photorealistic fashion product photograph of a faceless matte dark grey fashion mannequin wearing the garment,"
+        " a regular fit camel tan (#C2A878) cotton twill button-up shirt"
+    )
+    assert "faceless sculpted mannequin with a slim female figure standing straight" in prompt
+    assert "large window on the left, natural daylight casting crisp window-frame shadows" in prompt
+    assert "light grey wall and polished floor" in prompt and prompt.endswith("high-end fashion lookbook")
 
 
 def test_front_and_back_share_garment_wording() -> None:
@@ -70,7 +74,8 @@ def test_notes_are_tidied_and_appended() -> None:
 
 def test_mannequin_uses_finish_and_body() -> None:
     prompt = build_prompt(CATALOG, style(finish="chrome_silver", body="girl_teen"), "front")
-    assert "faceless chrome silver teenage girl mannequin" in prompt
+    assert "a faceless chrome silver fashion mannequin wearing the garment" in prompt
+    assert "with a teenage girl figure" in prompt
 
 
 def test_check_ids_and_validation() -> None:
@@ -84,5 +89,6 @@ def test_check_ids_and_validation() -> None:
 def test_mannequin_scenes_say_the_garment_is_worn() -> None:
     for scene in ("light_room", "plain_studio"):
         prompt = build_prompt(CATALOG, style(scene=scene), "front")
-        assert "fully dressed, wearing the garment, never shown nude" in prompt
+        assert "a faceless matte dark grey fashion mannequin wearing the garment" in prompt
+        assert "the garment fully dressed on the mannequin, never shown nude" in prompt
     assert "nude" not in build_prompt(CATALOG, style(scene="product_shot"), "front")
