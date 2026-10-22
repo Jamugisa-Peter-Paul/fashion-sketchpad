@@ -14,21 +14,25 @@ interface Props {
   /** 0..1 while running */
   progress?: number;
   onOpen?: (url: string) => void;
+  caption?: boolean;
 }
 
 /** One view of a render: the image when done, otherwise the sketch with progress. */
-export function RenderPanel({ view, status, imageUrl, sketchUrl, error, progress = 0, onOpen }: Props) {
+export function RenderPanel({ view, status, imageUrl, sketchUrl, error, progress = 0, onOpen, caption = true }: Props) {
   const { url } = useAuthedImage(status === "done" ? imageUrl : null);
   const { url: sketch } = useAuthedImage(status !== "done" ? sketchUrl : null);
 
   return (
     <figure className="flex min-w-0 flex-col gap-1.5">
       <div className="relative aspect-[832/1216] overflow-hidden rounded-2xl bg-surface shadow-[0_1px_8px_rgba(0,0,0,0.06)]">
-        {url ? (
-          <button type="button" className="size-full" onClick={() => onOpen?.(url)} aria-label={`Open ${VIEW_LABELS[view]} render`}>
+        {url && onOpen ? (
+          <button type="button" className="size-full" onClick={() => onOpen(url)} aria-label={`Open ${VIEW_LABELS[view]} render`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- blob URL */}
             <img src={url} alt={`${VIEW_LABELS[view]} render`} className="size-full object-cover" />
           </button>
+        ) : url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- blob URL
+          <img src={url} alt={`${VIEW_LABELS[view]} render`} className="size-full object-cover" />
         ) : (
           <>
             {sketch && (
@@ -56,7 +60,7 @@ export function RenderPanel({ view, status, imageUrl, sketchUrl, error, progress
           </>
         )}
       </div>
-      <figcaption className="text-center text-xs font-medium text-muted">{VIEW_LABELS[view]}</figcaption>
+      {caption && <figcaption className="text-center text-xs font-medium text-muted">{VIEW_LABELS[view]}</figcaption>}
     </figure>
   );
 }

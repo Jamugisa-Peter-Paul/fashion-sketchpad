@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fashion Sketchpad</string>
+    <string name="title_activity_main">Fashion Sketchpad</string>
+    <string name="package_name">org.ucudct.fashionsketchpad</string>
+    <string name="custom_url_scheme">org.ucudct.fashionsketchpad</string>
+</resources>

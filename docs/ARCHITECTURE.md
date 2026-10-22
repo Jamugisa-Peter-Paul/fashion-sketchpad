@@ -124,8 +124,15 @@ seed and different colour options. On restart, unfinished jobs are re-queued.
   saved to IndexedDB.
 - Drawing uses Pointer Events with pressure (stylus) and a constant width when pressure isn't reported
   (most fingers). The export is black on white, 832×1216, aligned to the guide.
-- The token is kept in Capacitor Preferences. The gateway URL comes from `NEXT_PUBLIC_API_URL`.
-- Capacitor plugins: Preferences, Camera, Filesystem, Share.
+- The token is kept in Capacitor Preferences. The gateway URL comes from `NEXT_PUBLIC_API_URL`, and can
+  be changed on the login screen.
+- Capacitor plugins: Preferences, Filesystem (Save), Share. Photos are taken with a plain
+  `<input type="file" capture>`, which the Capacitor webview hands to the camera app, so no Camera plugin
+  or camera permission is needed.
+- Every sketch goes through `/api/sketch/clean`. Drawn sketches are exported and cleaned when you tap
+  Generate. Paper photos are cleaned when added, so the user can check the preview and adjust the
+  placement. A reopened design re-renders from the sketches stored on the server.
+- See [APP.md](APP.md) for screens, local development and the APK build.
 
 ## Decisions and known limits
 

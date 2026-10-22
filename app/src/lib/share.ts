@@ -17,6 +17,9 @@ async function base64(blob: Blob): Promise<string> {
 /** Saves to Documents/FashionSketchpad on Android; downloads in a browser. Returns a short message. */
 export async function saveImages(files: ImageFile[]): Promise<string> {
   if (Capacitor.isNativePlatform()) {
+    // Only Android 10 and older actually ask; newer versions report "granted".
+    const permission = await Filesystem.requestPermissions();
+    if (permission.publicStorage !== "granted") return "Storage permission is needed to save. Use Share instead.";
     for (const file of files) {
       await Filesystem.writeFile({
         path: `${FOLDER}/${file.name}`,

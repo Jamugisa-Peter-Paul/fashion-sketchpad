@@ -124,6 +124,9 @@ export default function UploadPage() {
 
       <main className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-3 px-4 py-3">
         {error && <Notice tone="error">{error}</Notice>}
+        {draft.designId && !anyCleaned && (
+          <Notice>This design uses the sketches saved with it. Add a photo only to replace one.</Notice>
+        )}
 
         {busy === view ? (
           <div className="grid flex-1 place-items-center">
@@ -217,8 +220,8 @@ export default function UploadPage() {
       </main>
 
       <BottomBar>
-        <Button block disabled={!anyCleaned || busy !== null} onClick={() => router.push("/style/")}>
-          {anyCleaned ? "Next: style" : "Add at least the front"}
+        <Button block disabled={(!anyCleaned && !draft.designId) || busy !== null} onClick={() => router.push("/style/")}>
+          {anyCleaned || draft.designId ? "Next: style" : "Add at least the front"}
         </Button>
       </BottomBar>
     </div>

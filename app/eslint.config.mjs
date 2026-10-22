@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Capacitor native project (contains a copy of the built web app).
+    "android/**",
   ]),
 ]);
 

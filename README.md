@@ -5,7 +5,7 @@ self-hosted ComfyUI server.
 
 - `gateway/`: FastAPI service that runs next to ComfyUI on the server
 - `app/`: Next.js + Capacitor mobile app (Android first)
-- `docs/`: [Architecture](docs/ARCHITECTURE.md), [Deploying the gateway](docs/DEPLOY.md)
+- `docs/`: [Architecture](docs/ARCHITECTURE.md), [Deploying the gateway](docs/DEPLOY.md), [App and APK build](docs/APP.md)
 - `deploy/`: systemd unit and smoke-test script
 
 ## Gateway: local development (Windows, Python 3.12+)
@@ -43,3 +43,15 @@ curl -H "Authorization: Bearer <token>" http://127.0.0.1:8190/api/catalog
 .venv\Scripts\python -m gateway.tools.clean gateway\tests\samples\shirt_front_paper.jpeg
 # -> gateway\tools\out\shirt_front_paper_{lines,control,check}.png
 ```
+
+## App: local development
+
+```powershell
+cd app
+npm install
+copy .env.example .env.local   # NEXT_PUBLIC_API_URL=http://127.0.0.1:8190 for a local gateway
+npm run dev                    # http://localhost:3000, sign in with a token from APP_TOKENS
+```
+
+Debug APK: `powershell -ExecutionPolicy Bypass -File app\scripts\build-apk.ps1`. See [docs/APP.md](docs/APP.md).
+

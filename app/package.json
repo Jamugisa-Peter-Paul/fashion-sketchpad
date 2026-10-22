@@ -10,7 +10,7 @@
     "test": "vitest run",
     "cap:sync": "next build && cap sync android",
     "cap:open": "cap open android",
-    "apk:debug": "npm run cap:sync && cd android && gradlew.bat assembleDebug"
+    "apk:debug": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

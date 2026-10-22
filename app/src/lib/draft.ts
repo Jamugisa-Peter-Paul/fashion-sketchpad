@@ -132,6 +132,8 @@ export const useDraft = create<DraftState & DraftActions>()(
       },
       hasContent: () => {
         const s = getState();
+        // A reopened design can be re-rendered from the sketches stored on the server.
+        if (s.designId) return true;
         return s.method === "draw"
           ? Object.values(s.drawn).some((v) => hasInk(v))
           : Object.values(s.paper).some((v) => v?.cleanId);
