@@ -26,7 +26,7 @@ gateway turns those choices into a ComfyUI workflow.
 
 | Path | What |
 |---|---|
-| `gateway/` | Python package (run from the repo root: `uvicorn gateway.main:app`) |
+| `gateway/` | Python package (run from the repo root: `uvicorn gateway.main:create_app --factory`) |
 | `gateway/catalog.yaml` | Garments, fabrics, colours, prints, fits, details, scenes, finishes, bodies |
 | `gateway/tests/` | pytest suite. A fake ComfyUI means no GPU is needed |
 | `gateway/tools/` | CLIs, e.g. `python -m gateway.tools.clean <img>` |
@@ -49,7 +49,8 @@ as blob URLs. Tokens never go into URLs.
 | GET | `/api/health` | Liveness (public) |
 | GET | `/api/catalog` | All choices, plus each body's available template views |
 | GET | `/api/templates/{body}/{view}/guide.png` | Faint body outline to draw over |
-| POST | `/api/sketch/clean` | Image + source (`paper`/`drawn`) + mode ─► cleaned lines PNG preview |
+| POST | `/api/sketch/clean` | Image + source (`paper`/`drawn`) + scene/garment/body/view ─► `{clean_id, width, height, placement, lines_url, overlay_url}` |
+| GET | `/api/sketch/{clean_id}/lines.png`, `/overlay.png` | Cleaned crop: white-on-black (model input) / dark-on-transparent (for the editor) |
 | POST | `/api/generate` | Sketches + options ─► `{job_id, design_id}` |
 | GET | `/api/jobs/{id}` | Status per view, queue position, image URLs |
 | GET | `/api/jobs/{id}/{view}.png` | Render |
@@ -63,14 +64,20 @@ appear in the catalog with `available: false`, so the app can show them as "not 
 ### Render pipeline
 
 1. **Clean** each view's sketch into white lines on black at 832×1216.
-   - *Paper:* grayscale, divided by a heavy Gaussian blur (σ≈25) to flatten the paper lighting, then
-     darkness boost ≈1.5 minus 25, then remove specks under 25 px, then crop to the largest cluster.
-     The crop drops notes and labels, which would otherwise be printed into the render.
+   - *Paper* (`gateway/sketch.py`), at a fixed 1216 px working size: grayscale, mask out the table
+     or pencil if the photo shows them, divide by a heavy Gaussian blur (σ≈25) to flatten the paper
+     lighting, darkness boost ≈1.5 minus 25, remove specks under 25 px. Then keep only the garment: the
+     heaviest cluster of strokes, grown by clusters inside its convex hull (pockets, seams) or nearby,
+     tall and not cut off by the photo or paper edge. Labels, notes and neighbouring sketches fail
+     those tests and are dropped, so they don't get printed into the render.
    - *Drawn:* flatten onto white and invert. Kept aligned with the template.
    - *Placement:* for on-mannequin scenes a cropped paper sketch is auto-placed on the body by garment
-     `placement` (top / bottom / full) using the template mask. The app shows it over the guide and the
+     `placement` (top / bottom / full, or `figure` when the sketch shows a whole body), using
+     landmarks measured from the template mask (`gateway/placement.py`). The app shows it over the guide and the
      user can drag or pinch to adjust before generating.
    - *Product shot:* crop to the bounding box plus 30 px and scale to fill about 94% of the canvas.
+   Every sketch, drawn or photographed, goes through `/api/sketch/clean` once. Generate then refers to
+   its `clean_id` plus the final placement, so images are uploaded only once.
 2. **Prompt.** Scene template + garment description built from the catalog. Front and back use the same
    seed and identical colour and fabric wording. Explicit colour names with hex reduce drift.
 3. **Workflow.** UnetLoaderGGUF + DualCLIPLoader(flux) + VAE, FluxGuidance 3.5, ControlNet Union Pro 2.0
@@ -83,6 +90,7 @@ appear in the catalog with `available: false`, so the app can show them as "not 
 ### Data on disk
 
 ```
+DATA_DIR/uploads/<clean_id>/   sketch.png, lines.png, meta.json (deleted after 3 days)
 DATA_DIR/designs/<design_id>/
   design.json            choices, input method, body, garment, render history
   sketch_<view>.png      what the user drew / uploaded (normalised)

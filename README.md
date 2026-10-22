@@ -14,7 +14,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r gateway\requirements-dev.txt
 .venv\Scripts\python -m pytest
 copy gateway\.env.example gateway\.env   # then edit TEMPLATES_DIR, DATA_DIR, APP_TOKENS
-.venv\Scripts\python -m uvicorn gateway.main:app --env-file gateway\.env --port 8190 --reload
+.venv\Scripts\python -m uvicorn gateway.main:create_app --factory --env-file gateway\.env --port 8190 --reload
 ```
 
 Check it:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import yaml
 from pydantic import BaseModel
@@ -53,6 +53,12 @@ class Catalog(BaseModel):
             if item.id == item_id:
                 return item
         raise KeyError(f"Unknown {section} id: {item_id}")
+
+    def garment(self, item_id: str) -> Garment:
+        return cast(Garment, self.find("garments", item_id))
+
+    def scene(self, item_id: str) -> Scene:
+        return cast(Scene, self.find("scenes", item_id))
 
 
 class BodyStatus(Body):
