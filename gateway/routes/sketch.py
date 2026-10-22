@@ -137,6 +137,6 @@ def overlay_png(request: Request, clean_id: str) -> Response:
     lines = np.asarray(Image.open(_upload_file(request, clean_id, "lines.png")).convert("L"))
     rgba = np.zeros((*lines.shape, 4), np.uint8)
     rgba[..., :3] = 25
-    rgba[..., 3] = lines
+    rgba[..., 3] = np.clip(lines.astype(np.uint16) * 2, 0, 255)  # pencil is faint; boost for the preview only
     return Response(content=to_png(rgba), media_type="image/png")
 

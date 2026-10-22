@@ -36,6 +36,8 @@ export interface PaperView {
   width?: number;
   height?: number;
   placement?: Placement;
+  /** Placement the gateway suggested, for the "Auto" reset button. */
+  suggested?: Placement;
   /** Whether the sketch shows a whole figure (affects auto-placement). */
   wholeBody: boolean;
   /** Scene kind the placement was made for: placements differ between on-mannequin and product shot. */
