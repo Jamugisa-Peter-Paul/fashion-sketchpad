@@ -1,6 +1,6 @@
 # Deploying the gateway
 
-The steps below install the gateway on the Precision 5860 (`10.4.18.27`, user `dct`) next to ComfyUI and
+The steps below install the gateway on the Precision 5860 (`100.111.145.48`, user `dct`) next to ComfyUI and
 publish it as `https://fashion-api.ucu-dct.org` through the existing `coolify` Cloudflare tunnel.
 Nothing here touches ComfyUI, llama-swap, Coolify or the attendance system.
 
@@ -19,7 +19,7 @@ From the repo on Windows (PowerShell), ship only what git tracks:
 
 ```powershell
 git archive --format=tar.gz -o fashion-sketchpad.tar.gz HEAD
-scp fashion-sketchpad.tar.gz dct@10.4.18.27:/home/dct/
+scp fashion-sketchpad.tar.gz dct@100.111.145.48:/home/dct/
 ```
 
 On the server:
@@ -126,7 +126,7 @@ which takes about 60 s on the GPU. It prints the exact prompt sent to ComfyUI an
   neck line and the shoulders should span the green bar.
 - `/tmp/fashion-smoke-render.png`: the render.
 
-Copy them to Windows to look at them: `scp dct@10.4.18.27:/tmp/fashion-smoke-*.png .` Every job writes
+Copy them to Windows to look at them: `scp dct@100.111.145.48:/tmp/fashion-smoke-*.png .` Every job writes
 the same check image, and you can fetch it for any render from `GET /api/jobs/<job_id>/<view>/check.png`.
 
 ## 5. Cloudflare tunnel
@@ -248,7 +248,7 @@ nvidia-smi --query-gpu=index,power.limit --format=csv   # 115.00 W on both
 
 ```powershell
 git archive --format=tar.gz -o fashion-sketchpad.tar.gz HEAD
-scp fashion-sketchpad.tar.gz dct@10.4.18.27:/home/dct/
+scp fashion-sketchpad.tar.gz dct@100.111.145.48:/home/dct/
 ```
 
 ```bash

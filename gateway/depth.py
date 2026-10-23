@@ -20,14 +20,19 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from gateway.sketch import CANVAS_H, CANVAS_W, LINE_FLOOR
+from gateway.sketch import CANVAS_H, CANVAS_W
 
 DepthMode = str  # "fill" | "blank" | "off"
 
-CLOSE_RADIUS = 4  # px: bridges small gaps in the outline before filling it
-WIDE_CLOSE_RADIUS = 12  # second try for sketchier outlines
-GROW = 10  # px the region is grown past the lines (the lines have width; fabric drapes slightly beyond)
-FEATHER = 6.0  # gaussian sigma of the soft edge
+OUTLINE = 12  # control values above this count as outline; faint pencil included (see Control.outline)
+# Radius (px) of the "ball" rolled in from outside: gaps in the outline narrower than twice this are
+# bridged. The shape grows with the ball until the gaps are bridged, then levels off; the smallest ball
+# within LEVEL of the largest shape wins, so tidy drawings keep their exact shape and gappy pencil closes.
+BALL_RADII = (4, 8, 12, 16, 20, 24, 28, 32, 40)
+LEVEL = 0.95
+MIN_FILL = 0.5  # a found shape must cover at least this share of the lines' convex hull, else no shape
+GROW = 3  # px the region is grown past the lines (half a line's width plus a little)
+FEATHER = 1.0  # gaussian sigma of the edge. Keep it crisp: a soft depth edge renders as smoky, sheer fabric
 SMOOTH = 18.0  # gaussian sigma that smooths the body's depth inside the garment
 BODY = 10  # depth values above this are the mannequin, below are background
 
@@ -36,14 +41,20 @@ def _disk(radius: int) -> np.ndarray:
     return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1))
 
 
-def _fill_enclosed(outline: np.ndarray) -> np.ndarray:
-    """Outline plus everything it encloses: flood the background in from the canvas border, keep the rest."""
-    h, w = outline.shape
-    flood = np.zeros((h + 2, w + 2), np.uint8)
-    flood[1:-1, 1:-1] = outline.astype(np.uint8)
-    background = flood.copy()
-    cv2.floodFill(background, None, (0, 0), 2)  # the padded border is always background
-    return background[1:-1, 1:-1] != 2
+def _unreachable(ink: np.ndarray, radius: int) -> np.ndarray:
+    """Everything a ball of `radius` rolled in from outside the canvas can't reach without touching ink:
+    the garment, with gaps in its outline narrower than the ball bridged. Concave corners (armpits, the
+    crotch) get rounded by the ball's radius, which is harmless at these sizes."""
+    h, w = ink.shape
+    free = np.ones((h + 2, w + 2), np.uint8)
+    free[1:-1, 1:-1] = (~ink).astype(np.uint8)
+    room = cv2.distanceTransform(free, cv2.DIST_L2, 5) > radius
+    room[[0, -1], :] = True  # the ball starts anywhere outside the canvas
+    room[:, [0, -1]] = True
+    room = room.astype(np.uint8)
+    cv2.floodFill(room, None, (0, 0), 2)
+    reached = cv2.dilate((room == 2).astype(np.uint8), _disk(radius))
+    return reached[1:-1, 1:-1] == 0
 
 
 def _hull(mask: np.ndarray) -> np.ndarray:
@@ -82,29 +93,27 @@ def close_cut_edges(ink: np.ndarray, legs: bool = False) -> np.ndarray:
     return ink
 
 
-def garment_region(lines: np.ndarray, legs: bool = False) -> np.ndarray:
-    """Boolean mask of the area the sketched garment covers on the canvas.
+def garment_region(lines: np.ndarray, legs: bool = False, threshold: int = OUTLINE) -> np.ndarray:
+    """Boolean mask of the area the sketched garment covers on the canvas, or all False if no closed shape
+    can be found (the depth is then left as it is: a slightly tight fit beats a smoky blob).
 
-    The outline is filled (the gap between trouser legs stays open: it connects to the background). If the
-    outline has gaps so nothing gets enclosed, it is closed harder, and as a last resort the convex hull of
-    the lines is used.
+    Edges cut off by the canvas are closed first (for trousers, per leg, so the gap between the legs stays
+    open). Then the smallest ball that bridges the outline's gaps decides the shape (see BALL_RADII).
     """
-    ink = lines > LINE_FLOOR
-    if not ink.any():
-        return ink
-    hull = _hull(ink)
-    for radius in (CLOSE_RADIUS, WIDE_CLOSE_RADIUS):
-        closed = cv2.morphologyEx(ink.astype(np.uint8), cv2.MORPH_CLOSE, _disk(radius))
-        closed = close_cut_edges(cv2.dilate(closed, _disk(2)).astype(bool), legs)
-        filled = _fill_enclosed(closed)
-        # A closed outline encloses most of its own hull; an open one encloses next to nothing.
-        if (filled & ~closed).sum() >= 0.35 * hull.sum():
-            return filled
-    return hull
+    ink = lines > threshold
+    if ink.sum() < 50:
+        return np.zeros_like(ink)
+    ink = close_cut_edges(cv2.dilate(ink.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool), legs)
+    hull = int(_hull(ink).sum())
+    regions = [_unreachable(ink, radius) for radius in BALL_RADII]
+    largest = max(int(r.sum()) for r in regions)
+    if largest < MIN_FILL * hull:
+        return np.zeros_like(ink)
+    return next(r for r in regions if r.sum() >= LEVEL * largest)
 
 
 def soft_region(lines: np.ndarray, legs: bool = False, grow: int = GROW, feather: float = FEATHER) -> np.ndarray:
-    """garment_region grown by `grow` px with a feathered edge, as float 0..1."""
+    """garment_region grown by `grow` px with a slightly softened edge, as float 0..1."""
     region = garment_region(lines, legs).astype(np.uint8)
     if grow > 0:
         region = cv2.dilate(region, _disk(grow))
@@ -123,10 +132,12 @@ def load_depth(path: Path) -> np.ndarray:
 
 def garment_depth(depth: np.ndarray, lines: np.ndarray, mode: DepthMode = "fill", legs: bool = False) -> np.ndarray:
     """The template depth with the garment cut in (see the module docstring). uint8, same shape."""
-    if mode == "off" or not (lines > LINE_FLOOR).any():
+    if mode == "off":
         return depth.copy()
     d = depth.astype(np.float32)
     mask = soft_region(lines, legs)
+    if not mask.any():
+        return depth.copy()
     if mode == "blank":
         return np.clip(d * (1 - mask), 0, 255).astype(np.uint8)
 

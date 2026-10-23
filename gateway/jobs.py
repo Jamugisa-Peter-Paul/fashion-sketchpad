@@ -50,6 +50,9 @@ class Control:
     image: np.ndarray  # 832x1216 white-on-black lines fed to the lines ControlNet
     body: BodyLandmarks | None  # body it was placed on (None for product shots)
     background: Path | None  # template photo/outline, for the placement check image
+    # The same placement with faint pencil kept and lines not thinned: only used to find the garment's
+    # outline for the depth map (faint pencil leaves gaps in `image`).
+    outline: np.ndarray | None = None
 
 
 def compose_control(
@@ -71,7 +74,8 @@ def compose_control(
         placement = Placement(design_view.placement.cx, design_view.placement.cy, design_view.placement.scale)
     else:
         placement = suggest_placement(crop, catalog.garment(style.garment).placement, body)
-    return Control(place_on_canvas(crop, placement), body, background)
+    outline = place_on_canvas(crop, placement, stroke_target=None, floor=0)
+    return Control(place_on_canvas(crop, placement), body, background, outline)
 
 
 def control_files(control: Control) -> tuple[bytes, bytes]:
@@ -87,7 +91,8 @@ def _find_render(design: Design, job_id: str) -> Render:
 
 def depth_file(control: Control, depth_path: Path, mode: str, legs: bool = False) -> bytes:
     """The template depth with the garment's silhouette cut in (gateway/depth.py), as PNG."""
-    return to_png(garment_depth(load_depth(depth_path), control.image, mode, legs))
+    lines = control.outline if control.outline is not None else control.image
+    return to_png(garment_depth(load_depth(depth_path), lines, mode, legs))
 
 
 class RenderQueue:

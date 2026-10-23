@@ -78,7 +78,7 @@ plugin, run `npx cap sync android`.
 
 ### Testing against a plain-http gateway on the LAN
 
-Android blocks `http://` by default. To point a test build at `http://10.4.18.27:8190` (which also needs
+Android blocks `http://` by default. To point a test build at `http://100.111.145.48:8190` (which also needs
 the gateway to listen on `0.0.0.0`, or an SSH tunnel), build with
 `scripts\build-apk.ps1 -AllowHttp` and enter that address under **Server** on the login screen. Normal
 builds use the HTTPS Cloudflare address and don't need this.

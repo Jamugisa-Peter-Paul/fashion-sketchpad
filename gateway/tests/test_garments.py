@@ -127,3 +127,31 @@ def test_one_piece_garments_are_one_piece_from_behind(stem: str) -> None:
     style = StyleOptions(garment=GARMENTS[stem], body="female_slim")
     back = build_prompt(CATALOG, style, "back")
     assert "one-piece" in back and "one continuous" in back
+
+
+@pytest.mark.parametrize("sample", ["shirt_front_paper.jpeg", "shirt_back_paper.jpeg"])
+def test_faint_pencil_outline_still_closes(sample: str) -> None:
+    """Real pencil: after cleaning, the outline is broken into dashes (hem, sleeve edges). The garment shape
+    must still come out whole, not a convex-hull blob (rendered as smoke around the arms) or fragments."""
+    from gateway.depth import _hull
+
+    crop = clean_paper(Image.open(GARMENTS_DIR.parent / sample)).lines
+    placement = suggest_placement(crop, "top", default_landmarks())
+    outline = place_on_canvas(crop, placement, stroke_target=None, floor=0)
+    region = garment_region(outline)
+    hull = _hull(outline > 12)
+    assert region.sum() > 0.85 * hull.sum()
+    # Crisp edge: the depth jumps from body/garment to background within a few pixels.
+    depth = garment_depth(mannequin_depth(), outline, "fill")
+    row = depth[int(region.nonzero()[0].mean())]
+    edge = np.nonzero(row > BODY)[0][0]
+    assert row[edge + 3] > 100
+
+
+def test_no_closed_shape_leaves_the_depth_alone() -> None:
+    lines = np.zeros((CANVAS_H, CANVAS_W), np.uint8)
+    for x in range(150, 700, 150):  # scattered dashes, far apart: no outline
+        lines[300:330, x : x + 3] = 255
+    depth = mannequin_depth()
+    assert not garment_region(lines).any()
+    assert np.array_equal(garment_depth(depth, lines, "fill"), depth)

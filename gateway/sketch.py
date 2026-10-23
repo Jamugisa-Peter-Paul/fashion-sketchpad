@@ -269,9 +269,12 @@ def normalize_strokes(lines: np.ndarray, target: float = STROKE_TARGET) -> np.nd
     return out
 
 
-def place_on_canvas(crop: np.ndarray, placement: Placement, stroke_target: float | None = STROKE_TARGET) -> np.ndarray:
+def place_on_canvas(
+    crop: np.ndarray, placement: Placement, stroke_target: float | None = STROKE_TARGET, floor: int = LINE_FLOOR
+) -> np.ndarray:
     """Scales the crop and pastes it centred at (cx, cy) on a black canvas; anything off-canvas is clipped.
-    Lines wider than `stroke_target` after scaling are thinned (None keeps them as they are)."""
+    Lines wider than `stroke_target` after scaling are thinned (None keeps them as they are), and values
+    below `floor` dropped (0 keeps faint pencil, for finding the garment's outline)."""
     if placement.scale <= 0:
         raise SketchError("Placement scale must be positive")
     h, w = crop.shape
@@ -282,7 +285,7 @@ def place_on_canvas(crop: np.ndarray, placement: Placement, stroke_target: float
     if stroke_target is not None:
         scaled = normalize_strokes(scaled, stroke_target)
     # Only clear lines reach the ControlNet: faint grey (paper texture, soft pencil edges) is dropped.
-    scaled[scaled < LINE_FLOOR] = 0
+    scaled[scaled < floor] = 0
 
     canvas = np.zeros((CANVAS_H, CANVAS_W), np.uint8)
     left, top = round(placement.cx - new_w / 2), round(placement.cy - new_h / 2)
