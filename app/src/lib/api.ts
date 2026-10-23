@@ -4,8 +4,10 @@ import type {
   CleanResponse,
   DesignOut,
   DesignSummary,
+  DetailsResponse,
   GenerateRequest,
   JobStatus,
+  ViewName,
 } from "./types";
 
 export class ApiError extends Error {
@@ -70,6 +72,9 @@ export const api = {
   },
   catalog: () => json<Catalog>("/api/catalog"),
   clean: (form: FormData) => json<CleanResponse>("/api/sketch/clean", { method: "POST", body: form }),
+  /** Reads construction details off cleaned sketches with the server's vision LLM (can take a minute). */
+  details: (garment: string, views: Partial<Record<ViewName, string>>) =>
+    post<DetailsResponse>("/api/sketch/details", { garment, views }),
   generate: (request: GenerateRequest) => post<{ job_id: string; design_id: string }>("/api/generate", request),
   job: (id: string) => json<JobStatus>(`/api/jobs/${id}`),
   designs: () => json<DesignSummary[]>("/api/designs"),

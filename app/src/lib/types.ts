@@ -13,6 +13,8 @@ export interface Choice {
 }
 export interface Garment extends Choice {
   placement: "top" | "bottom" | "full";
+  back?: string;
+  legs?: boolean;
 }
 export interface Colour extends Choice {
   hex: string;
@@ -68,6 +70,22 @@ export interface StyleOptions {
   scene: string;
   finish: string;
   notes: string;
+  /** Construction details per view; null = let the gateway read them off the sketch at render time. */
+  details?: SketchDetails | null;
+}
+
+/** Construction details read off the sketch (gateway/details.py). */
+export interface SketchDetails {
+  garment: string[];
+  front: string[];
+  back: string[];
+  side: string[];
+}
+
+export interface DetailsResponse {
+  details: SketchDetails | null;
+  /** Why the details couldn't be read (the render still works without them). */
+  error: string | null;
 }
 
 export interface GenerateRequest {
@@ -86,6 +104,7 @@ export interface JobStatus {
   position: number | null;
   eta_seconds: number | null;
   views: Partial<Record<ViewName, { status: ViewStatus; error: string | null; image_url: string | null }>>;
+  details?: SketchDetails | null;
 }
 
 export interface DesignSummary {
@@ -106,6 +125,7 @@ export interface RenderOut {
   created_at: number;
   status: ViewStatus;
   image_urls: Partial<Record<ViewName, string>>;
+  details?: SketchDetails | null;
 }
 
 export interface DesignOut {

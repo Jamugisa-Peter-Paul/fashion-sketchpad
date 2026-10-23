@@ -1,6 +1,7 @@
 import { fetchBlob } from "./api";
 import { useDraft, type DrawnView, type StyleChoice } from "./draft";
 import { sketchToBase } from "./strokes";
+import { detailsKey } from "./submit";
 import type { Catalog, DesignOut, ViewName } from "./types";
 
 /**
@@ -19,18 +20,26 @@ export async function openDesign(design: DesignOut, catalog: Catalog | null): Pr
   }
   const { garment, body, ...style } = design.style;
   const group = catalog?.bodies.find((b) => b.id === body)?.group ?? "women";
-  useDraft.getState().reset({
+  const state = useDraft.getState();
+  state.reset({
     method,
     group,
     body,
     garment,
     drawn,
     paper: {},
-    style: style as StyleChoice,
+    style: { ...style, details: style.details ?? null } as StyleChoice,
     designId: design.id,
     jobId: design.renders.at(-1)?.id,
     lastSeed: design.renders.at(-1)?.seed,
     title: design.title,
   });
+  adoptDetails();
   return method;
+}
+
+/** Details that came with a reopened design belong to its sketches as they are now. */
+export function adoptDetails(): void {
+  const state = useDraft.getState();
+  if (state.style.details) state.update({ detailsFor: detailsKey(state) });
 }

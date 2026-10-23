@@ -46,6 +46,14 @@ export interface PaperView {
 
 export type StyleChoice = Omit<StyleOptions, "garment" | "body">;
 
+/** A drawn view already uploaded and cleaned (for reading details), reused at generate time if unchanged. */
+export interface DrawnClean {
+  cleanId: string;
+  /** fingerprint of the strokes it was made from */
+  sig: string;
+  at: number;
+}
+
 export interface DraftState {
   method: Method;
   group: Group;
@@ -54,6 +62,9 @@ export interface DraftState {
   drawn: Partial<Record<ViewName, DrawnView>>;
   paper: Partial<Record<ViewName, PaperView>>;
   style: StyleChoice;
+  /** Which sketches `style.details` were read from (see detailsKey); other sketches = read again. */
+  detailsFor?: string;
+  drawnClean: Partial<Record<ViewName, DrawnClean>>;
   /** Set after the first generate; later generates add renders to the same design. */
   designId?: string;
   jobId?: string;
@@ -82,6 +93,7 @@ export const DEFAULT_STYLE: StyleChoice = {
   scene: "light_room",
   finish: "matte_dark_grey",
   notes: "",
+  details: null,
 };
 
 export function defaultStyle(catalog: Catalog | null): StyleChoice {
@@ -101,6 +113,7 @@ function emptyDraft(): DraftState {
     garment: "",
     drawn: {},
     paper: {},
+    drawnClean: {},
     style: DEFAULT_STYLE,
     title: "",
     updatedAt: Date.now(),
@@ -140,7 +153,17 @@ export const useDraft = create<DraftState & DraftActions>()(
       },
     }),
     // skipHydration: IndexedDB only exists in the browser; AuthGate calls rehydrate() on mount.
-    { name: "draft", storage: createJSONStorage(() => idbStorage), version: 1, skipHydration: true },
+    {
+      name: "draft",
+      storage: createJSONStorage(() => idbStorage),
+      version: 2,
+      skipHydration: true,
+      // v1 drafts predate sketch details: start with "not read yet".
+      migrate: (persisted) => {
+        const state = persisted as DraftState;
+        return { ...state, drawnClean: state.drawnClean ?? {}, style: { ...DEFAULT_STYLE, ...state.style } };
+      },
+    },
   ),
 );
 

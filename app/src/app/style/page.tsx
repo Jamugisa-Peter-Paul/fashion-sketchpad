@@ -2,6 +2,7 @@
 
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DetailsEditor } from "@/components/DetailsEditor";
 import { StylePicker } from "@/components/StylePicker";
 import { BottomBar, Button, Notice, Page, Spinner, TopBar } from "@/components/ui";
 import { labelOf, useCatalog } from "@/lib/catalog";
@@ -33,6 +34,11 @@ export default function StylePage() {
       <Page>
         {!ready && <div className="mb-6"><Notice tone="warn">Add a sketch first. Go back to draw or upload one.</Notice></div>}
         <StylePicker catalog={catalog} style={draft.style} onChange={draft.setStyle} />
+        {ready && (
+          <div className="mt-8 md:max-w-xl">
+            <DetailsEditor />
+          </div>
+        )}
       </Page>
       <BottomBar>
         <Button block disabled={!ready} icon={<Sparkles className="size-5" />} onClick={() => router.push("/generate/?new=1")}>

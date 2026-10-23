@@ -8,7 +8,8 @@ import { Button, Notice, Page, Section, Spinner, TopBar, cx } from "@/components
 import { api, ApiError, fetchBlob } from "@/lib/api";
 import { labelOf, useCatalog } from "@/lib/catalog";
 import { useDraft } from "@/lib/draft";
-import { openDesign } from "@/lib/openDesign";
+import { countDetails } from "@/lib/details";
+import { adoptDetails, openDesign } from "@/lib/openDesign";
 import { shareImages } from "@/lib/share";
 import type { DesignOut, RenderOut, ViewName } from "@/lib/types";
 
@@ -54,7 +55,13 @@ function DesignScreen() {
     setBusy(target);
     try {
       const method = await openDesign(design!, catalog);
-      if (render) useDraft.getState().update({ jobId: render.id, style: { ...useDraft.getState().style, ...render.style } });
+      if (render) {
+        // The details the render actually used, if the app left reading them to the server.
+        const used = countDetails(render.details) > 0 ? render.details : null;
+        const details = render.style.details ?? used ?? null;
+        useDraft.getState().update({ jobId: render.id, style: { ...useDraft.getState().style, ...render.style, details } });
+        adoptDetails();
+      }
       router.push(target === "style" ? "/style/" : method === "draw" ? "/sketch/" : "/upload/");
     } finally {
       setBusy(null);
