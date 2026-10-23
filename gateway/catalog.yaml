@@ -137,6 +137,8 @@ stitching:
   - { id: contrast, label: Contrast, prompt: "contrast topstitching" }
 
 # Placeholders: {garment} = full garment description, {finish} = mannequin finish ("matte dark grey"),
+# {colour} = the garment colour again ("camel tan (#C2A878)"); restated at the end because in long prompts
+# (many details) Flux let the colour and the mannequin finish fade into one neutral cream.
 # {figure} = body type ("slim female"); {mannequin} = "{finish} {figure}" is also available.
 # The body templates are mannequins, and their depth map (DEPTH_STRENGTH) brings the mannequin's shape and pose
 # through. On-mannequin scenes say the mannequin wears the garment: without it the garment can come out as a
@@ -155,7 +157,7 @@ scenes:
       feet, in a bright minimalist studio
       with a large window on the left, natural daylight casting crisp window-frame shadows on the light grey
       wall and polished floor, exact garment construction, crisp seams and stitching, realistic fabric texture,
-      high-end fashion lookbook
+      high-end fashion lookbook. Colours: the garment is {colour}, the mannequin is {finish}
   - id: plain_studio
     label: Plain studio
     on_mannequin: true
@@ -166,14 +168,14 @@ scenes:
       volume, bare mannequin arms and legs only where the garment does not cover them, full body from head to
       feet, plain light grey seamless studio
       background, soft even studio lighting, exact garment construction, crisp seams and stitching, realistic
-      fabric texture, high-end fashion lookbook
+      fabric texture, high-end fashion lookbook. Colours: the garment is {colour}, the mannequin is {finish}
   - id: product_shot
     label: Product shot
     on_mannequin: false
     prompt: >-
       Photorealistic ghost mannequin product photograph of {garment}, the garment fills the frame, nothing below
       the hem, plain light grey studio background, soft even lighting, exact garment construction, crisp seams
-      and topstitching, realistic fabric texture, e-commerce lookbook
+      and topstitching, realistic fabric texture, e-commerce lookbook. Colour: the garment is {colour}
 
 mannequin_finishes:
   - { id: matte_dark_grey, label: Matte dark grey, default: true, prompt: "matte dark grey" }

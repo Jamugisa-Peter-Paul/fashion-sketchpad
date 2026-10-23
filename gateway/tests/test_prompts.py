@@ -29,7 +29,9 @@ def test_light_room_prompt_matches_proven_recipe() -> None:
     )
     assert "faceless sculpted mannequin with a slim female figure standing straight" in prompt
     assert "large window on the left, natural daylight casting crisp window-frame shadows" in prompt
-    assert "light grey wall and polished floor" in prompt and prompt.endswith("high-end fashion lookbook")
+    assert "light grey wall and polished floor" in prompt and prompt.endswith(
+        "high-end fashion lookbook. Colours: the garment is camel tan (#C2A878), the mannequin is matte dark grey"
+    )
 
 
 def test_front_and_back_share_garment_wording() -> None:

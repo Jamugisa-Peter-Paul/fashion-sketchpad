@@ -136,5 +136,11 @@ def build_prompt(
     items = view_details(catalog, style, view, details)
     if items:
         garment += ", with these exact construction details: " + ", ".join(items)
-    prompt = scene.prompt.format(garment=garment, finish=finish, figure=figure, mannequin=f"{finish} {figure}")
+    prompt = scene.prompt.format(
+        garment=garment,
+        finish=finish,
+        figure=figure,
+        mannequin=f"{finish} {figure}",
+        colour=colour_words(catalog, style),
+    )
     return (VIEW_HINTS.get(view, "") if view_hint else "") + prompt
