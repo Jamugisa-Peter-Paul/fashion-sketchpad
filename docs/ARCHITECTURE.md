@@ -51,15 +51,18 @@ as blob URLs. Tokens never go into URLs.
 | GET | `/api/templates/{body}/{view}/guide.png` | Faint body outline to draw over |
 | POST | `/api/sketch/clean` | Image + source (`paper`/`drawn`) + scene/garment/body/view ─► `{clean_id, width, height, placement, lines_url, overlay_url}` |
 | GET | `/api/sketch/{clean_id}/lines.png`, `/overlay.png` | Cleaned crop: white-on-black (model input) / dark-on-transparent (for the editor) |
+| POST | `/api/sketch/details` | JSON `{garment, views: {front: clean_id}}` ─► `{details: {garment, front, back, side} \| null, error}` read by the vision LLM |
 | POST | `/api/generate` | JSON `{design_id?, title?, style, views: {front: {clean_id, placement?}}, seed?}` ─► 202 `{job_id, design_id}` |
-| GET | `/api/jobs/{id}` | `{status, seed, position, eta_seconds, views: {front: {status, error, image_url}}}` |
+| GET | `/api/jobs/{id}` | `{status, seed, position, eta_seconds, views: {front: {status, error, image_url}}, details}` |
 | GET | `/api/jobs/{id}/{view}.png` | Render |
+| GET | `/api/jobs/{id}/{view}/check.png`, `/depth.png`, `/workflow.json` | Placement check, garment-shaped depth, exact ComfyUI workflow |
 | GET | `/api/designs` | Gallery summaries with thumbnail URL |
 | GET/PATCH/DELETE | `/api/designs/{id}` | Full design with render history / rename / delete |
 | GET | `/api/designs/{id}/{sketch\|lines}/{view}.png` | Stored sketch and cleaned lines, for "Edit sketch" |
 
 `style` is `StyleOptions` in `gateway/prompts.py`: catalog ids for garment, body, colour (or
-`custom_hex`), print, fabric, fit, buttons, stitching, scene, finish, plus `notes`. *New variation*
+`custom_hex`), print, fabric, fit, buttons, stitching, scene, finish, plus `notes` and `details`
+(construction details per view; `null` = the gateway reads them off the sketch at render time). *New variation*
 posts the same style with no seed. *Change colour* posts a new style with the seed of the render it
 changes. For an existing design, `views` may be empty, which reuses the stored sketches.
 
@@ -82,27 +85,41 @@ appear in the catalog with `available: false`, so the app can show them as "not 
      `placement` (`gateway/placement.py`). The body is measured from the template mask at fixed
      fractions of its height: neck 16%, shoulders 20% (shoulder width measured there), waist 38%,
      hips 50%. For tops and full-length garments the sketch's own shoulder width (where the shoulder
-     seams turn into sleeves) is scaled to the body's, with the collar at the neck. The sketch's
+     seams turn into sleeves, and stay sleeves for a while) is scaled to the body's, with the collar at
+     the neck. A hood above the shoulders is recognised and the shoulder line goes on the shoulders. The sketch's
      proportions then carry the hem to the hips, knees or floor. Bottoms match the waistband to the
      waist, and `figure` (whole-body sketches) maps head to feet. The app shows it over the guide and the
      user can drag or pinch to adjust before generating.
    - *Product shot:* crop to the bounding box plus 30 px and scale to fill about 94% of the canvas.
+   - *Line width:* after scaling, lines wider than about 2.5 px are thinned (enlarged pencil lines were
+     copied as white piping).
    Every sketch, drawn or photographed, goes through `/api/sketch/clean` once. Generate then refers to
    its `clean_id` plus the final placement, so images are uploaded only once.
-2. **Prompt.** Scene template + garment description built from the catalog. Front and back use the same
-   seed and identical colour and fabric wording. Explicit colour names with hex reduce drift.
-3. **Workflow** (`gateway/workflow.py`). Pure text-to-image: KSampler (euler/simple, 28 steps, cfg 1,
+2. **Details** (`gateway/details.py`). A vision LLM on llama-swap (optional, `LLM_URL`) looks at the
+   original sketch photos and lists construction details as JSON: `garment` (true from every side, e.g.
+   "one-piece jumpsuit"), `front`, `back`. Colour, fabric and drawing words are filtered out. The app shows
+   them as chips on the Style screen; if it sends none, the worker reads them once per sketch set and keeps
+   them on the design. Any LLM failure just means no details.
+3. **Prompt.** Scene template + garment description built from the catalog, then "with these exact
+   construction details: ..." for that view: the catalog's back-view wording (shirt collar seen from
+   behind, one-piece garments not split), the shared details, then the view's own. Front and back use the
+   same seed and identical colour and fabric wording. Explicit colour names with hex reduce drift.
+4. **Workflow** (`gateway/workflow.py`). Pure text-to-image: KSampler (euler/simple, 28 steps, cfg 1,
    denoise 1.0) starts from an EmptySD3LatentImage at 832×1216. Nothing from the sketch is encoded into
    the latent or blended into the result. The sketch (white lines on black) is only a ControlNet Union
    Pro 2.0 hint: strength 0.7 / end 0.6 for paper sketches, 0.8 / 0.7 for drawn ones (stronger or longer
-   and Flux copies the lines as black outlines with a flat fill). Enlarged sketches use linear
+   and Flux copies the lines as black outlines with a flat fill). On a mannequin the lines must also win
+   against the body: 0.8 / 0.75 paper, 0.85 / 0.8 drawn. Enlarged sketches use linear
    interpolation, and grey below 40 is dropped, so no soft fringe reaches the ControlNet. In on-mannequin
-   scenes a second ControlNet uses the mannequin template's depth at strength 0.6 / end 0.7 for the
-   mannequin's shape and pose; it's off for product shots. On-mannequin prompts start with "a faceless
+   scenes a second ControlNet uses the mannequin template's depth at strength 0.6 / end 0.6 for the
+   mannequin's shape and pose; it's off for product shots. The raw body depth fought the lines (wide
+   trousers came out skinny, skirts as bodysuits), so `gateway/depth.py` first cuts the garment in: the
+   drawn outline is filled (edges cut off by the canvas are closed; for trousers the gap between the legs
+   stays open) and becomes a smooth solid. Head, bare arms and legs keep the mannequin's depth. On-mannequin prompts start with "a faceless
    matte dark grey fashion mannequin wearing the garment" (the finish follows the user's choice).
    FluxGuidance 3.5. A test (`gateway/tests/workflow_checks.py`) asserts the images only feed
    ControlNet inputs.
-4. **Queue** (`gateway/jobs.py`). One worker submits views one after another (`/upload/image`,
+5. **Queue** (`gateway/jobs.py`). One worker submits views one after another (`/upload/image`,
    `/prompt`, poll `/history/{id}`, `/view`) and copies results into the design folder. Expect about
    60 s per view. The ComfyUI `prompt_id` is saved, so after a gateway restart a view ComfyUI still
    knows about is collected, not rendered again.
@@ -121,6 +138,7 @@ DATA_DIR/designs/<design_id>/
   control_<view>.png     last 832x1216 control image sent to ComfyUI
   check_<job_id>_<view>.png  placement check: control lines over the template with neck/shoulder/waist/hip
                          lines (GET /api/jobs/{id}/{view}/check.png)
+  depth_<job_id>_<view>.png  body depth with the garment cut in (GET /api/jobs/{id}/{view}/depth.png)
   workflow_<job_id>_<view>.json  exact ComfyUI workflow queued (GET /api/jobs/{id}/{view}/workflow.json)
   prompt_<job_id>_<view>.txt     final prompt text
   render_<job_id>_<view>.png
@@ -144,9 +162,12 @@ seed and different colour options. On restart, unfinished jobs are re-queued.
 - Capacitor plugins: Preferences, Filesystem (Save), Share. Photos are taken with a plain
   `<input type="file" capture>`, which the Capacitor webview hands to the camera app, so no Camera plugin
   or camera permission is needed.
-- Every sketch goes through `/api/sketch/clean`. Drawn sketches are exported and cleaned when you tap
-  Generate. Paper photos are cleaned when added, so the user can check the preview and adjust the
+- Every sketch goes through `/api/sketch/clean`. Drawn sketches are exported and cleaned on the Style
+  screen (to read their details) and that upload is reused when you tap Generate if the drawing hasn't
+  changed. Paper photos are cleaned when added, so the user can check the preview and adjust the
   placement. A reopened design re-renders from the sketches stored on the server.
+- The Style screen's *Sketch details* section asks `/api/sketch/details` once per sketch set and shows the
+  result as chips (remove / add per group). Editing the sketch or changing the garment reads them again.
 - See [APP.md](APP.md) for screens, local development and the APK build.
 
 ## Decisions and known limits
@@ -156,6 +177,10 @@ seed and different colour options. On restart, unfinished jobs are re-queued.
 - Progress is estimated from queue position and elapsed time against about 60 s per view. Per-step
   progress over ComfyUI's websocket can be added later.
 - "Change colour" re-renders with the same seed, so construction stays close but not identical.
+- Auto-placement can't find shoulders on batwing/kaftan-style sleeves and places them too small; drag them
+  into place in the app.
+- `gateway/tests/samples/garments/` is the regression set (10 garments, front and back).
+  `python -m gateway.tools.regression` renders them through a live gateway into contact sheets.
 - Catalog prompt wording is a first draft. Regional garments (gomesi, kanzu) and fabrics (kitenge,
   barkcloth) are described in plain words because Flux doesn't know the names well. Tune them in
   `catalog.yaml`.
