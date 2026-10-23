@@ -33,3 +33,6 @@ app/android/local.properties
 Thumbs.db
 .vscode/
 .idea/
+
+# Deploy archives (git archive output, see docs/DEPLOY.md)
+*.tar.gz
