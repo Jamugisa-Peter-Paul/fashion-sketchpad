@@ -21,7 +21,7 @@ from PIL import Image
 from gateway.catalog import Catalog
 from gateway.comfy import ComfyClient, ComfyError
 from gateway.config import Settings
-from gateway.depth import garment_depth, load_depth
+from gateway.depth import garment_depth, load_depth, strip_outline
 from gateway.designs import DesignNotFound, DesignStore
 from gateway.details import DetailsClient, DetailsError, SketchDetails
 from gateway.models import Design, DesignView, Render, RenderView, View
@@ -56,7 +56,13 @@ class Control:
 
 
 def compose_control(
-    folder: Path, view: str, design_view: DesignView, style: StyleOptions, catalog: Catalog, templates_dir: Path
+    folder: Path,
+    view: str,
+    design_view: DesignView,
+    style: StyleOptions,
+    catalog: Catalog,
+    templates_dir: Path,
+    strip: bool = True,
 ) -> Control:
     crop = np.asarray(Image.open(folder / f"lines_{view}.png").convert("L"))
     if not catalog.scene(style.scene).on_mannequin:
@@ -75,7 +81,10 @@ def compose_control(
     else:
         placement = suggest_placement(crop, catalog.garment(style.garment).placement, body)
     outline = place_on_canvas(crop, placement, stroke_target=None, floor=0)
-    return Control(place_on_canvas(crop, placement), body, background, outline)
+    lines = place_on_canvas(crop, placement)
+    if strip:
+        lines = strip_outline(lines, outline, catalog.garment(style.garment).legs)
+    return Control(lines, body, background, outline)
 
 
 def control_files(control: Control) -> tuple[bytes, bytes]:
@@ -270,7 +279,14 @@ class RenderQueue:
         folder = self.store.folder(design.id)
         style = render.style
         control = await asyncio.to_thread(
-            compose_control, folder, view, design.views[view], style, self.catalog, self.settings.templates_dir
+            compose_control,
+            folder,
+            view,
+            design.views[view],
+            style,
+            self.catalog,
+            self.settings.templates_dir,
+            self.settings.render.strip_outline,
         )
         control_png, check_png = await asyncio.to_thread(control_files, control)
         (folder / f"control_{view}.png").write_bytes(control_png)

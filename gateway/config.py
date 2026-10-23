@@ -50,6 +50,9 @@ class RenderSettings:
     mannequin_paper_lines_end: float = 0.75  # [MANNEQUIN_PAPER_LINES_END]
     mannequin_drawn_lines_strength: float = 0.85  # [MANNEQUIN_DRAWN_LINES_STRENGTH]
     mannequin_drawn_lines_end: float = 0.8  # [MANNEQUIN_DRAWN_LINES_END]
+    # On a mannequin, drop the garment's outer outline from the lines (the depth gives the shape); left in,
+    # it was painted as a grey edge trim. Neckline and collar lines are kept.
+    strip_outline: bool = True  # [STRIP_OUTLINE]
     view_hint: bool = True  # [VIEW_HINT] prefix "Back view." / "Side view." to non-front prompts
     view_timeout_s: int = 600  # give up on a view after this long
     poll_interval_s: float = 1.0
@@ -86,6 +89,7 @@ class RenderSettings:
             ),
             mannequin_drawn_lines_end=float(env.get("MANNEQUIN_DRAWN_LINES_END", cls.mannequin_drawn_lines_end)),
             view_hint=env.get("VIEW_HINT", "1").lower() not in ("0", "false", "no"),
+            strip_outline=env.get("STRIP_OUTLINE", "1").lower() not in ("0", "false", "no"),
         )
 
 

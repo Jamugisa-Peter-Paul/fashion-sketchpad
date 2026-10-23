@@ -155,3 +155,25 @@ def test_no_closed_shape_leaves_the_depth_alone() -> None:
     depth = mannequin_depth()
     assert not garment_region(lines).any()
     assert np.array_equal(garment_depth(depth, lines, "fill"), depth)
+
+
+def test_outer_outline_is_stripped_but_inside_details_stay() -> None:
+    """On the mannequin, the garment's outer edge was painted as a grey trim. It is removed from the lines;
+    seams, darts and pockets inside the garment, and the neckline at the top, stay."""
+    from gateway.depth import strip_outline
+
+    crop = cleaned("01_aline_dress", "front")
+    placement = suggest_placement(crop, "full", default_landmarks())
+    lines = place_on_canvas(crop, placement)
+    outline = place_on_canvas(crop, placement, stroke_target=None, floor=0)
+    stripped = strip_outline(lines, outline)
+    region = garment_region(outline)
+    ys, xs = np.nonzero(region)
+    mid_row = int(ys.min() + 0.6 * (ys.max() - ys.min()))
+    cols = np.nonzero(region[mid_row])[0]
+    edge_band = slice(max(cols[0] - 3, 0), cols[0] + 6)
+    assert (lines[mid_row - 20 : mid_row + 20, edge_band] > LINE_FLOOR).any()  # the side was there...
+    assert not (stripped[mid_row - 20 : mid_row + 20, edge_band] > LINE_FLOOR).any()  # ...and is gone
+    waist = int(ys.min() + 0.35 * (ys.max() - ys.min()))
+    assert (stripped[waist - 60 : waist + 60, xs.mean().astype(int) - 40 : xs.mean().astype(int) + 40] > LINE_FLOOR).any()
+    assert (stripped[ys.min() : ys.min() + 30] > LINE_FLOOR).any()  # neckline kept

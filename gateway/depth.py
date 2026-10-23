@@ -112,6 +112,29 @@ def garment_region(lines: np.ndarray, legs: bool = False, threshold: int = OUTLI
     return next(r for r in regions if r.sum() >= LEVEL * largest)
 
 
+def strip_outline(
+    lines: np.ndarray, outline: np.ndarray, legs: bool = False, width: float = 7.0, keep_top: float = 0.12
+) -> np.ndarray:
+    """The control lines without the garment's outer outline (on-mannequin renders).
+
+    The depth map already gives the garment its shape. Left in the lines too, Flux paints the outline as a
+    grey edge trim and pins the edges flat, so lines within `width` px of the garment's edge are removed.
+    The top `keep_top` of the garment (neckline, collar, shoulders) keeps its lines. If no garment shape
+    is found, the lines are returned unchanged.
+    """
+    region = garment_region(outline, legs)
+    if not region.any():
+        return lines
+    depth_in = cv2.distanceTransform(region.astype(np.uint8), cv2.DIST_L2, 5)
+    edge = depth_in <= width  # also everything outside the garment
+    rows = np.nonzero(region.any(axis=1))[0]
+    keep_to = int(rows[0] + keep_top * (rows[-1] - rows[0]))
+    edge[: keep_to + 1] = False
+    out = lines.copy()
+    out[edge] = 0
+    return out
+
+
 def soft_region(lines: np.ndarray, legs: bool = False, grow: int = GROW, feather: float = FEATHER) -> np.ndarray:
     """garment_region grown by `grow` px with a slightly softened edge, as float 0..1."""
     region = garment_region(lines, legs).astype(np.uint8)
