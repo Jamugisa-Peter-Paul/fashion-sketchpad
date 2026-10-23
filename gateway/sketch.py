@@ -21,6 +21,12 @@ LINE_FLOOR = 40  # control-image values below this are set to black
 # Line width (px) on the 832x1216 control image. Sketches enlarged ~1.5-2x come out 3.5-4 px wide, and Flux
 # then copies them literally as piping or white outlines (the bomber jacket). Thicker lines are thinned to this.
 STROKE_TARGET = 2.5
+# Pencil gets dimmer when a sketch is shrunk onto the mannequin (thin lines are averaged with the black
+# around them), and the faintest strokes (a hem, a sleeve edge) then fall under LINE_FLOOR and vanish. Lines
+# are brightened so their 90th percentile reaches this, at most LINE_GAIN_MAX times. Drawn lines are already
+# bright and stay as they are.
+LINE_P90 = 180
+LINE_GAIN_MAX = 3.0
 WORK_LONG_SIDE = 1216
 MAX_SOURCE_PIXELS = 40_000_000
 
@@ -256,6 +262,17 @@ def stroke_width(lines: np.ndarray) -> float:
     return 2.0 * area / max(edge, 1)
 
 
+def brighten_lines(lines: np.ndarray, target: float = LINE_P90, max_gain: float = LINE_GAIN_MAX) -> np.ndarray:
+    """Scales faint pencil up so its 90th percentile reaches `target` (see LINE_P90). Never darkens."""
+    ink = lines[lines > 12]
+    if ink.size < 50:
+        return lines
+    gain = min(target / max(float(np.percentile(ink, 90)), 1.0), max_gain)
+    if gain <= 1.05:
+        return lines
+    return np.clip(lines.astype(np.float32) * gain, 0, 255).astype(np.uint8)
+
+
 def normalize_strokes(lines: np.ndarray, target: float = STROKE_TARGET) -> np.ndarray:
     """Thins lines wider than `target` by eroding (a 3x3 erosion takes ~2 px off, a 2x2 one ~1 px).
     Never thickens: thin pencil lines are left as they are."""
@@ -282,6 +299,7 @@ def place_on_canvas(
     # Linear, not cubic, when enlarging: cubic overshoots and leaves a faint ring around every line.
     interp = cv2.INTER_AREA if placement.scale < 1 else cv2.INTER_LINEAR
     scaled = cv2.resize(crop, (new_w, new_h), interpolation=interp)
+    scaled = brighten_lines(scaled)
     if stroke_target is not None:
         scaled = normalize_strokes(scaled, stroke_target)
     # Only clear lines reach the ControlNet: faint grey (paper texture, soft pencil edges) is dropped.

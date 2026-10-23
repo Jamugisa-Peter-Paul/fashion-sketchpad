@@ -27,7 +27,7 @@ def test_light_room_prompt_matches_proven_recipe() -> None:
         "Photorealistic fashion product photograph of a faceless matte dark grey fashion mannequin wearing the garment,"
         " a regular fit camel tan (#C2A878) cotton twill button-up shirt"
     )
-    assert "faceless sculpted mannequin with a slim female figure standing straight" in prompt
+    assert "faceless matte dark grey sculpted mannequin with a smooth featureless egg-shaped head and a slim female figure standing straight" in prompt
     assert "large window on the left, natural daylight casting crisp window-frame shadows" in prompt
     assert "light grey wall and polished floor" in prompt and prompt.endswith(
         "high-end fashion lookbook. Colours: the garment is camel tan (#C2A878), the mannequin is matte dark grey"
@@ -113,7 +113,7 @@ def test_notes_are_tidied_and_appended() -> None:
 def test_mannequin_uses_finish_and_body() -> None:
     prompt = build_prompt(CATALOG, style(finish="chrome_silver", body="girl_teen"), "front")
     assert "a faceless chrome silver fashion mannequin wearing the garment" in prompt
-    assert "with a teenage girl figure" in prompt
+    assert "and a teenage girl figure" in prompt
 
 
 def test_check_ids_and_validation() -> None:
