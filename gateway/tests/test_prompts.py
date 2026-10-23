@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from gateway.catalog import load_catalog
+from gateway.details import SketchDetails
 from gateway.prompts import StyleOptions, build_prompt, garment_description, nearest_colour
 
 CATALOG = load_catalog()
@@ -34,8 +35,43 @@ def test_light_room_prompt_matches_proven_recipe() -> None:
 def test_front_and_back_share_garment_wording() -> None:
     front = build_prompt(CATALOG, style(), "front")
     back = build_prompt(CATALOG, style(), "back")
-    assert back == "Back view. " + front
-    assert build_prompt(CATALOG, style(), "back", view_hint=False) == front
+    garment = garment_description(CATALOG, style())
+    assert garment in front and garment in back
+    # The back adds what Flux tends to lose from behind (here: the collar), nothing else changes.
+    back_extra = ", with these exact construction details: the shirt collar visible folded around the back of the neck, a back yoke seam"
+    assert back == "Back view. " + front.replace(garment, garment + back_extra)
+    assert build_prompt(CATALOG, style(), "front", view_hint=False) == front
+
+
+def test_one_piece_garments_stay_one_piece_from_behind() -> None:
+    back = build_prompt(CATALOG, style(garment="jumpsuit"), "back")
+    assert "one-piece jumpsuit" in back and "not a separate top and trousers" in back
+    assert "not a separate" not in build_prompt(CATALOG, style(garment="jumpsuit"), "front")
+
+
+def test_details_go_into_their_own_view_after_the_shared_ones() -> None:
+    details = SketchDetails(garment=["pointed collar"], front=["five-button placket", "pointed collar"], back=["box pleat"])
+    s = style(details=details)
+    front = build_prompt(CATALOG, s, "front")
+    back = build_prompt(CATALOG, s, "back")
+    assert "with these exact construction details: pointed collar, five-button placket, Photo" not in front
+    assert "construction details: pointed collar, five-button placket. A faceless" in front
+    assert "construction details: the shirt collar visible folded around the back of the neck, a back yoke seam," \
+        " pointed collar, box pleat. A faceless" in back
+    assert "box pleat" not in front and "five-button" not in back
+
+
+def test_explicit_details_override_the_style_ones() -> None:
+    s = style(details=SketchDetails(front=["patch pockets"]))
+    prompt = build_prompt(CATALOG, s, "front", details=SketchDetails(front=["welt pockets"]))
+    assert "welt pockets" in prompt and "patch pockets" not in prompt
+
+
+def test_user_details_are_sanitised() -> None:
+    details = SketchDetails(front=["  Two {flap} pockets. ", "x" * 200, "", "two flap pockets"] + [f"d{i}" for i in range(20)])
+    assert details.front[0] == "two flap pockets"
+    assert len(details.front[1]) == 60
+    assert len(details.front) == 8 and details.front.count("two flap pockets") == 1
 
 
 def test_product_shot_has_no_mannequin() -> None:

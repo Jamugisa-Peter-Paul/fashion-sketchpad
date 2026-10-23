@@ -22,6 +22,8 @@ class Choice(BaseModel):
 
 class Garment(Choice):
     placement: Literal["top", "bottom", "full"]
+    back: str = ""  # added to back-view prompts: what must not get lost from behind (collar, one piece)
+    legs: bool = False  # trousers, shorts, jumpsuits: the gap between the legs is not garment
 
 
 class Colour(Choice):

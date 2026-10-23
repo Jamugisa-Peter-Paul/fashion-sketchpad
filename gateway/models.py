@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from gateway.details import SketchDetails
 from gateway.prompts import StyleOptions
 
 View = Literal["front", "back", "side"]
@@ -45,6 +46,7 @@ class Render(BaseModel):
     seed: int
     style: StyleOptions
     views: dict[View, RenderView]
+    details: SketchDetails | None = None  # construction details this render's prompts used
     created_at: float = Field(default_factory=time.time)
 
     @property
@@ -65,6 +67,9 @@ class Design(BaseModel):
     style: StyleOptions  # latest choices
     views: dict[View, DesignView] = {}
     renders: list[Render] = []
+    # Details the LLM read off the current sketches (reset when a sketch is replaced). Used when the app
+    # sends no details of its own, so New variation / Change colour don't ask the LLM again.
+    details: SketchDetails | None = None
 
 
 class ViewInput(BaseModel):
@@ -104,6 +109,7 @@ class JobStatus(BaseModel):
     position: int | None  # jobs ahead of this one in the queue (0 = next / running)
     eta_seconds: int | None
     views: dict[View, JobViewStatus]
+    details: SketchDetails | None = None
 
 
 class DesignSummary(BaseModel):

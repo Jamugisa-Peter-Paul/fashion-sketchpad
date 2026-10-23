@@ -7,34 +7,75 @@
 garments:
   # placement: where the garment sits on the body, used to auto-place paper sketches on a template.
   #   top = shoulders to hip, bottom = waist down, full = shoulders down past the knee.
-  - { id: shirt, label: Shirt, placement: top, prompt: "button-up shirt" }
-  - { id: blouse, label: Blouse, placement: top, prompt: "blouse" }
-  - { id: dress, label: Dress, placement: full, prompt: "dress" }
-  - { id: skirt, label: Skirt, placement: bottom, prompt: "skirt" }
-  - { id: trousers, label: Trousers, placement: bottom, prompt: "trousers" }
-  - { id: shorts, label: Shorts, placement: bottom, prompt: "shorts" }
-  - { id: suit, label: Suit, placement: full, prompt: "two-piece suit with a tailored jacket and matching trousers" }
-  - { id: jacket, label: Jacket, placement: top, prompt: "jacket" }
-  - { id: coat, label: Coat, placement: full, prompt: "coat" }
-  - { id: hoodie, label: Hoodie, placement: top, prompt: "hoodie" }
+  # legs: true for garments with legs; the gap between them is kept free when shaping the body depth.
+  # back: added to the back-view prompt only. Seen from behind, Flux tends to forget collars and to split
+  #   one-piece garments into a top and a bottom; this keeps the back the same garment as the front.
+  - id: shirt
+    label: Shirt
+    placement: top
+    prompt: "button-up shirt"
+    back: "the shirt collar visible folded around the back of the neck, a back yoke seam"
+  - id: blouse
+    label: Blouse
+    placement: top
+    prompt: "blouse"
+    back: "the same neckline and collar seen from behind"
+  - id: dress
+    label: Dress
+    placement: full
+    prompt: "one-piece dress"
+    back: "one continuous dress from shoulders to hem, the same length as the front"
+  - { id: skirt, label: Skirt, placement: bottom, prompt: "skirt", back: "the same length and flare as the front" }
+  - id: trousers
+    label: Trousers
+    placement: bottom
+    prompt: "trousers"
+    legs: true
+    back: "the same leg width and length as the front"
+  - { id: shorts, label: Shorts, placement: bottom, legs: true, prompt: "shorts", back: "the same leg width and length as the front" }
+  - id: suit
+    label: Suit
+    placement: full
+    prompt: "two-piece suit with a tailored jacket and matching trousers"
+    legs: true
+    back: "the jacket collar visible around the back of the neck"
+  - id: jacket
+    label: Jacket
+    placement: top
+    prompt: "jacket"
+    back: "the jacket collar visible around the back of the neck"
+  - id: coat
+    label: Coat
+    placement: full
+    prompt: "coat"
+    back: "the coat collar visible around the back of the neck, one continuous coat down to the hem"
+  - { id: hoodie, label: Hoodie, placement: top, prompt: "hoodie", back: "the hood hanging down the back" }
   - id: kaftan
     label: Kaftan
     placement: full
-    prompt: "kaftan, a long loose robe-like tunic with wide sleeves and a slit neckline"
+    prompt: "one-piece kaftan, a long loose robe-like tunic with wide sleeves and a slit neckline"
+    back: "one continuous robe from shoulders to hem, wide sleeves"
   - id: gomesi
     label: Gomesi
     placement: full
     prompt: >-
-      gomesi (Ugandan busuuti), a floor-length dress with high peaked puffed shoulders,
+      gomesi (Ugandan busuuti), a one-piece floor-length dress with high peaked puffed shoulders,
       a square neckline with a short front button placket, and a wide sash tied around the hips
+    back: "one continuous floor-length dress, high peaked puffed shoulders, the sash tied in a bow at the back"
   - id: kanzu
     label: Kanzu
     placement: full
     prompt: >-
-      kanzu, an ankle-length long-sleeved robe with a round collarless neckline
+      kanzu, a one-piece ankle-length long-sleeved robe with a round collarless neckline
       and a narrow embroidered placket ending in a small tassel at the neck
+    back: "one continuous ankle-length robe, plain back"
   - { id: two_piece, label: Two-piece, placement: full, prompt: "matching two-piece set of a top and a bottom" }
-  - { id: jumpsuit, label: Jumpsuit, placement: full, prompt: "jumpsuit" }
+  - id: jumpsuit
+    label: Jumpsuit
+    placement: full
+    prompt: "one-piece jumpsuit, the bodice and trousers cut as a single continuous garment"
+    legs: true
+    back: "one continuous jumpsuit from shoulders to ankles, not a separate top and trousers"
 
 fabrics:
   - { id: cotton, label: Cotton, prompt: "cotton" }
@@ -109,7 +150,9 @@ scenes:
     prompt: >-
       Photorealistic fashion product photograph of a faceless {finish} fashion mannequin wearing the garment,
       {garment}. A faceless sculpted mannequin with a {figure} figure standing straight, the garment fully
-      dressed on the mannequin, never shown nude, full body from head to feet, in a bright minimalist studio
+      dressed on the mannequin, never shown nude, opaque fabric that keeps the exact drawn silhouette and
+      volume, bare mannequin arms and legs only where the garment does not cover them, full body from head to
+      feet, in a bright minimalist studio
       with a large window on the left, natural daylight casting crisp window-frame shadows on the light grey
       wall and polished floor, exact garment construction, crisp seams and stitching, realistic fabric texture,
       high-end fashion lookbook
@@ -119,7 +162,9 @@ scenes:
     prompt: >-
       Photorealistic fashion product photograph of a faceless {finish} fashion mannequin wearing the garment,
       {garment}. A faceless sculpted mannequin with a {figure} figure standing straight, the garment fully
-      dressed on the mannequin, never shown nude, full body from head to feet, plain light grey seamless studio
+      dressed on the mannequin, never shown nude, opaque fabric that keeps the exact drawn silhouette and
+      volume, bare mannequin arms and legs only where the garment does not cover them, full body from head to
+      feet, plain light grey seamless studio
       background, soft even studio lighting, exact garment construction, crisp seams and stitching, realistic
       fabric texture, high-end fashion lookbook
   - id: product_shot

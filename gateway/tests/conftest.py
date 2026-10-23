@@ -8,9 +8,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from gateway.config import RenderSettings, Settings
+from gateway.config import LlmSettings, RenderSettings, Settings
 from gateway.main import create_app
 from gateway.tools.fake_comfy import create_fake_comfy
+from gateway.tools.fake_llm import create_fake_llm
 
 TOKEN = "test-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -51,7 +52,26 @@ def fake_comfy() -> FastAPI:
 
 
 @pytest.fixture
+def fake_llm() -> FastAPI:
+    return create_fake_llm()
+
+
+@pytest.fixture
 def client(settings: Settings, fake_comfy: FastAPI) -> TestClient:
+    """Detail reading off (no LLM_URL), like a server without the LLM set up."""
     app = create_app(settings, comfy_transport=httpx.ASGITransport(app=fake_comfy))
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def llm_client(settings: Settings, fake_comfy: FastAPI, fake_llm: FastAPI) -> TestClient:
+    """Detail reading on, answered by the fake LLM."""
+    settings.llm = LlmSettings(url="http://llm.test/v1", api_key="llm-secret", timeout_s=5)
+    app = create_app(
+        settings,
+        comfy_transport=httpx.ASGITransport(app=fake_comfy),
+        llm_transport=httpx.ASGITransport(app=fake_llm),
+    )
     with TestClient(app) as test_client:
         yield test_client

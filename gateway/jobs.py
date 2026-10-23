@@ -21,7 +21,9 @@ from PIL import Image
 from gateway.catalog import Catalog
 from gateway.comfy import ComfyClient, ComfyError
 from gateway.config import Settings
+from gateway.depth import garment_depth, load_depth
 from gateway.designs import DesignNotFound, DesignStore
+from gateway.details import DetailsClient, DetailsError, SketchDetails
 from gateway.models import Design, DesignView, Render, RenderView, View
 from gateway.placement import BodyLandmarks, check_image, default_landmarks, landmarks_from_mask, load_mask, suggest_placement
 from gateway.prompts import StyleOptions, build_prompt
@@ -83,10 +85,23 @@ def _find_render(design: Design, job_id: str) -> Render:
     return next(r for r in design.renders if r.id == job_id)
 
 
+def depth_file(control: Control, depth_path: Path, mode: str, legs: bool = False) -> bytes:
+    """The template depth with the garment's silhouette cut in (gateway/depth.py), as PNG."""
+    return to_png(garment_depth(load_depth(depth_path), control.image, mode, legs))
+
+
 class RenderQueue:
-    def __init__(self, store: DesignStore, comfy: ComfyClient, catalog: Catalog, settings: Settings) -> None:
+    def __init__(
+        self,
+        store: DesignStore,
+        comfy: ComfyClient,
+        catalog: Catalog,
+        settings: Settings,
+        details: DetailsClient | None = None,
+    ) -> None:
         self.store = store
         self.comfy = comfy
+        self.details = details
         self.catalog = catalog
         self.settings = settings
         self._queue: asyncio.Queue[str] = asyncio.Queue()
@@ -174,9 +189,37 @@ class RenderQueue:
         if not design_id or not self.store.exists(design_id):
             return  # design deleted while queued
         render = _find_render(self.store.load(design_id), job_id)
+        if any(state.status in ("queued", "running") for state in render.views.values()):
+            await self._resolve_details(design_id, job_id)
         for view, state in render.views.items():
             if state.status in ("queued", "running"):
                 await self._render_view(design_id, job_id, view)
+
+    async def _resolve_details(self, design_id: str, job_id: str) -> None:
+        """Pick the construction details for this render, once: the user's chips, else the details already
+        read off these sketches, else ask the LLM now. Without any, the render just uses the sketch."""
+        design = self.store.load(design_id)
+        render = _find_render(design, job_id)
+        if render.details is not None:
+            return
+        details = render.style.details if render.style.details is not None else design.details
+        if details is None and self.details is not None and self.details.enabled:
+            folder = self.store.folder(design_id)
+            sketches = {view: folder / f"sketch_{view}.png" for view in design.views}
+            sketches = {view: path for view, path in sketches.items() if path.exists()}
+            try:
+                details = await self.details.extract(self.catalog.garment(render.style.garment).prompt, sketches)
+            except DetailsError as exc:
+                log.warning("Job %s: no sketch details (%s)", job_id, exc)
+            except Exception:  # details are optional: never let them stop the render
+                log.exception("Job %s: reading sketch details crashed", job_id)
+        try:
+            with self.store.update(design_id) as stored:
+                if details is not None and stored.details is None and render.style.details is None:
+                    stored.details = details
+                _find_render(stored, job_id).details = details or SketchDetails()
+        except DesignNotFound:
+            pass
 
     def _set_view(self, design_id: str, job_id: str, view: View, **changes: object) -> None:
         with self.store.update(design_id) as design:
@@ -231,11 +274,18 @@ class RenderQueue:
         lines_name = await self.comfy.upload_image(control_png, f"fashion_{render.id}_{view}.png")
 
         depth_name = None
+        on_mannequin = self.catalog.scene(style.scene).on_mannequin
         template = find_view(self.settings.templates_dir, style.body, view)
-        if self.catalog.scene(style.scene).on_mannequin and template.depth and self.settings.render.depth_strength > 0:
-            depth_name = await self.comfy.upload_image(template.depth.read_bytes(), f"fashion_depth_{style.body}_{view}.png")
+        if on_mannequin and template.depth and self.settings.render.depth_strength > 0:
+            legs = self.catalog.garment(style.garment).legs
+            depth_png = await asyncio.to_thread(
+                depth_file, control, template.depth, self.settings.render.depth_garment, legs
+            )
+            # GET /api/jobs/{job}/{view}/depth.png
+            (folder / f"depth_{render.id}_{view}.png").write_bytes(depth_png)
+            depth_name = await self.comfy.upload_image(depth_png, f"fashion_depth_{render.id}_{view}.png")
 
-        prompt = build_prompt(self.catalog, style, view, self.settings.render.view_hint)
+        prompt = build_prompt(self.catalog, style, view, self.settings.render.view_hint, render.details)
         workflow = build_workflow(
             prompt,
             lines_name,
@@ -244,6 +294,7 @@ class RenderQueue:
             depth_name,
             filename_prefix=f"fashion/{render.id}_{view}",
             source=design.views[view].source,
+            on_mannequin=on_mannequin,
         )
         # Exactly what ComfyUI gets, for debugging: GET /api/jobs/{job}/{view}/workflow.json. The file is
         # ComfyUI's API format, so it can also be queued by hand (POST /prompt) to reproduce a render.

@@ -4,8 +4,9 @@ The template body is measured from `<view>_mask.png` at fixed fractions of its h
     neck 16%, shoulders 20%, waist 38%, hips 50%
 The sketch is measured too: where its collar starts and how wide its shoulders are. Then, by garment
 `placement`:
-    top, full  shoulder width = body shoulder width, collar at the neck. The sketch's own proportions then
-               carry the hem down: hip-length shirts end at the hips, dresses and coats further down.
+    top, full  shoulder width = body shoulder width, collar at the neck (hoods: shoulder line on the
+               shoulders). The sketch's own proportions then carry the hem down: hip-length shirts end at
+               the hips, dresses and coats further down.
     bottom     waistband width = body waist width (+5% ease), waistband at the waist.
     figure     the sketch shows a whole body: head to feet onto the template's head to feet.
 The result is a starting point: the app lets the user drag/pinch it before generating.
@@ -151,6 +152,7 @@ class SketchMeasure:
     top_width: float  # width of the first few rows (a waistband, for bottoms)
     top_cx: float
     center_x: float  # middle of the ink
+    hood: bool = False  # something with straight sides sits above the shoulders (a hood, a tall collar)
 
 
 def measure_sketch(crop: np.ndarray) -> SketchMeasure:
@@ -182,15 +184,24 @@ def measure_sketch(crop: np.ndarray) -> SketchMeasure:
     # Skip past the collar, which is narrow but also has near-vertical sides.
     min_reach = 0.175 * (cols[-1] - cols[0] + 1)
 
-    def knee(reach: np.ndarray) -> int:
-        """First row where this side stops moving outwards quickly (shoulder seam -> sleeve)."""
+    # A hood (or a high stand collar) also has near-vertical sides, but below it the shoulders widen fast
+    # again. A real shoulder is followed by the sleeve: slow widening for a good stretch.
+    sustain = max(window, round(0.2 * height))
+    max_after = 0.1 * (cols[-1] - cols[0] + 1)
+
+    def knee(reach: np.ndarray) -> tuple[int, bool]:
+        """First row where this side stops moving outwards quickly (shoulder seam -> sleeve) for good, and
+        whether a much narrower plateau above it had to be skipped (a hood's sides, or a head)."""
+        plateau: float | None = None
         for i in range(limit):
             if reach[i] >= min_reach and (reach[i + window] - reach[i]) / window < 0.6:
-                return i
-        return limit
+                if reach[min(i + sustain, height - 1)] - reach[i] <= max_after:
+                    return i, plateau is not None and plateau < 0.75 * reach[i]
+                plateau = reach[i] if plateau is None else plateau
+        return limit, False
 
-    left_i = knee(top_cx - left_run)
-    right_i = knee(right_run - top_cx)
+    left_i, left_hood = knee(top_cx - left_run)
+    right_i, right_hood = knee(right_run - top_cx)
     shoulder_left, shoulder_right = float(left_run[left_i]), float(right_run[right_i])
     return SketchMeasure(
         top=top,
@@ -201,6 +212,7 @@ def measure_sketch(crop: np.ndarray) -> SketchMeasure:
         top_width=float(head_cols[-1] - head_cols[0] + 1),
         top_cx=top_cx,
         center_x=(cols[0] + cols[-1]) / 2,
+        hood=left_hood and right_hood,
     )
 
 
@@ -209,7 +221,11 @@ def suggest_placement(crop: np.ndarray, kind: PlacementKind, body: BodyLandmarks
     m = measure_sketch(crop)
     if kind in ("top", "full"):
         scale = body.shoulder_width / m.shoulder_width
-        anchor_crop, anchor_body = (m.shoulder_cx, m.top), (body.center_x, body.neck)
+        if m.hood:
+            # A hood (or tall collar) above the shoulders: put the shoulder line on the shoulders instead.
+            anchor_crop, anchor_body = (m.shoulder_cx, m.shoulder_y), (body.center_x, body.shoulder)
+        else:
+            anchor_crop, anchor_body = (m.shoulder_cx, m.top), (body.center_x, body.neck)
     elif kind == "bottom":
         scale = body.waist_width * BOTTOM_EASE / m.top_width
         anchor_crop, anchor_body = (m.top_cx, m.top), (body.center_x, body.waist)

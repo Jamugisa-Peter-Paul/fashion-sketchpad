@@ -75,14 +75,22 @@ def test_front_and_back_render_with_same_seed(client: TestClient, fake_comfy: Fa
     assert len(workflows) == 2
     assert workflows[0]["11"]["inputs"]["seed"] == workflows[1]["11"]["inputs"]["seed"] == status["seed"]
     front_prompt, back_prompt = (wf["4"]["inputs"]["text"] for wf in workflows)
-    assert back_prompt == "Back view. " + front_prompt
+    # Same garment wording (colour drift otherwise); only the back gets the catalog's back-view wording.
+    garment = "a regular fit camel tan (#C2A878) cotton twill button-up shirt with tonal stitching"
+    assert garment in front_prompt and garment in back_prompt
+    assert back_prompt.startswith("Back view. ") and "collar visible folded around the back" in back_prompt
+    assert "collar visible" not in front_prompt
     assert "15" in workflows[0]  # body depth ControlNet is used on the template
 
-    # Pure text-to-image with paper-sketch strengths; the exact workflow and prompt are kept per job.
+    # Pure text-to-image with on-mannequin paper-sketch strengths; the exact workflow, prompt and the
+    # garment-shaped depth are kept per job.
     for view, workflow in zip(("front", "back"), workflows):
         assert_pure_text_to_image(workflow)
-        assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.7, 0.6)
-        assert (workflow["15"]["inputs"]["strength"], workflow["15"]["inputs"]["end_percent"]) == (0.6, 0.7)
+        assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.8, 0.75)
+        assert (workflow["15"]["inputs"]["strength"], workflow["15"]["inputs"]["end_percent"]) == (0.6, 0.6)
+        assert workflow["14"]["inputs"]["image"] == f"fashion_depth_{ids['job_id']}_{view}.png"
+        depth = client.get(f"/api/jobs/{ids['job_id']}/{view}/depth.png", headers=AUTH)
+        assert depth.status_code == 200 and Image.open(io.BytesIO(depth.content)).size == (CANVAS_W, CANVAS_H)
         saved = client.get(f"/api/jobs/{ids['job_id']}/{view}/workflow.json", headers=AUTH)
         assert saved.status_code == 200 and saved.json() == workflow
         design_dir = settings.data_dir / "designs" / ids["design_id"]
@@ -213,7 +221,8 @@ def test_drawn_sketch_uses_drawn_strengths(client: TestClient, fake_comfy: FastA
     wait_for_job(client, ids["job_id"])
     workflow = submitted_prompts(fake_comfy)[0]
     assert_pure_text_to_image(workflow)
-    assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.8, 0.7)
+    # Light Room (on a mannequin): the lines are held tighter there so the body doesn't win.
+    assert (workflow["9"]["inputs"]["strength"], workflow["9"]["inputs"]["end_percent"]) == (0.85, 0.8)
 
 
 def test_workflow_json_404_before_submission(client: TestClient) -> None:

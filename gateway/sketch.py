@@ -18,6 +18,9 @@ from PIL import Image, ImageOps
 
 CANVAS_W, CANVAS_H = 832, 1216
 LINE_FLOOR = 40  # control-image values below this are set to black
+# Line width (px) on the 832x1216 control image. Sketches enlarged ~1.5-2x come out 3.5-4 px wide, and Flux
+# then copies them literally as piping or white outlines (the bomber jacket). Thicker lines are thinned to this.
+STROKE_TARGET = 2.5
 WORK_LONG_SIDE = 1216
 MAX_SOURCE_PIXELS = 40_000_000
 
@@ -243,8 +246,32 @@ class Placement:
     scale: float
 
 
-def place_on_canvas(crop: np.ndarray, placement: Placement) -> np.ndarray:
-    """Scales the crop and pastes it centred at (cx, cy) on a black canvas; anything off-canvas is clipped."""
+def stroke_width(lines: np.ndarray) -> float:
+    """Typical line width in px: for thin strokes, area ~ length x width and perimeter ~ 2 x length."""
+    ink = (lines > 127).astype(np.uint8)
+    area = int(ink.sum())
+    if area == 0:
+        return 0.0
+    edge = int((ink - cv2.erode(ink, np.ones((3, 3), np.uint8))).sum())
+    return 2.0 * area / max(edge, 1)
+
+
+def normalize_strokes(lines: np.ndarray, target: float = STROKE_TARGET) -> np.ndarray:
+    """Thins lines wider than `target` by eroding (a 3x3 erosion takes ~2 px off, a 2x2 one ~1 px).
+    Never thickens: thin pencil lines are left as they are."""
+    excess = stroke_width(lines) - target
+    if excess < 0.5:
+        return lines
+    full = min(int(excess // 2), 4)
+    out = cv2.erode(lines, np.ones((3, 3), np.uint8), iterations=full) if full else lines
+    if excess - 2 * full >= 0.5:
+        out = cv2.erode(out, np.ones((2, 2), np.uint8))
+    return out
+
+
+def place_on_canvas(crop: np.ndarray, placement: Placement, stroke_target: float | None = STROKE_TARGET) -> np.ndarray:
+    """Scales the crop and pastes it centred at (cx, cy) on a black canvas; anything off-canvas is clipped.
+    Lines wider than `stroke_target` after scaling are thinned (None keeps them as they are)."""
     if placement.scale <= 0:
         raise SketchError("Placement scale must be positive")
     h, w = crop.shape
@@ -252,6 +279,8 @@ def place_on_canvas(crop: np.ndarray, placement: Placement) -> np.ndarray:
     # Linear, not cubic, when enlarging: cubic overshoots and leaves a faint ring around every line.
     interp = cv2.INTER_AREA if placement.scale < 1 else cv2.INTER_LINEAR
     scaled = cv2.resize(crop, (new_w, new_h), interpolation=interp)
+    if stroke_target is not None:
+        scaled = normalize_strokes(scaled, stroke_target)
     # Only clear lines reach the ControlNet: faint grey (paper texture, soft pencil edges) is dropped.
     scaled[scaled < LINE_FLOOR] = 0
 

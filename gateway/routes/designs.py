@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from gateway.auth import require_token
 from gateway.designs import DesignNotFound
+from gateway.details import SketchDetails
 from gateway.models import Design, DesignSummary, DesignView, RenderView, View, ViewStatus
 from gateway.prompts import StyleOptions
 from gateway.routes.jobs import render_image_url
@@ -23,6 +24,7 @@ class RenderOut(BaseModel):
     created_at: float
     status: ViewStatus
     image_urls: dict[View, str]
+    details: SketchDetails | None = None  # the construction details its prompts used
 
 
 class DesignOut(BaseModel):

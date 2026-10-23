@@ -18,14 +18,15 @@ def build_workflow(
     depth_image: str | None = None,
     filename_prefix: str = "fashion/render",
     source: str = "drawn",
+    on_mannequin: bool = False,
 ) -> dict[str, Any]:
     """Pure text-to-image: KSampler starts from an empty latent (denoise 1.0). The sketch (white lines on
     black) and the body depth are only ControlNet hints; no image is encoded into the latent or blended in.
 
     `lines_image` / `depth_image` are names returned by ComfyUI's /upload/image. `source` ("paper" or
-    "drawn") picks the sketch ControlNet strength.
+    "drawn") and `on_mannequin` pick the sketch ControlNet strength.
     """
-    lines_strength, lines_end = render.lines_for(source)
+    lines_strength, lines_end = render.lines_for(source, on_mannequin)
     workflow: dict[str, Any] = {
         "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": render.unet}},
         "2": {
@@ -75,7 +76,8 @@ def build_workflow(
     }
 
     if depth_image and render.depth_strength > 0:
-        # Second ControlNet (same Union Pro model) keeps the mannequin's body shape from the template.
+        # Second ControlNet (same Union Pro model) keeps the mannequin's body shape from the template. The depth
+        # image has the garment's silhouette cut into it (gateway/depth.py), so it no longer fights the lines.
         workflow["14"] = {"class_type": "LoadImage", "inputs": {"image": depth_image}}
         workflow["15"] = {
             "class_type": "ControlNetApplyAdvanced",

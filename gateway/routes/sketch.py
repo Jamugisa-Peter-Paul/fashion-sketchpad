@@ -7,6 +7,7 @@ and a suggested placement on the 832x1216 canvas; /api/generate then references 
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Literal
@@ -18,6 +19,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from gateway.auth import require_token
+from gateway.details import DetailsError, SketchDetails
 from gateway.models import PlacementModel
 from gateway.placement import default_landmarks, landmarks_from_mask, load_mask, suggest_placement
 from gateway.routes import read_upload
@@ -35,6 +37,7 @@ from gateway.sketch import (
 from gateway.storage import write_json
 from gateway.templates import find_view
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sketch", dependencies=[Depends(require_token)])
 
 SKETCH_MAX_SIDE = 2048  # stored copy of the original, for the gallery
@@ -118,6 +121,48 @@ def clean(
         lines_url=f"/api/sketch/{clean_id}/lines.png",
         overlay_url=f"/api/sketch/{clean_id}/overlay.png",
     )
+
+
+class DetailsRequest(BaseModel):
+    garment: str
+    views: dict[Literal["front", "back", "side"], str]  # view -> clean_id
+
+
+class DetailsResponse(BaseModel):
+    """`details` is None when they could not be read; `error` then says why (the render still works)."""
+
+    details: SketchDetails | None = None
+    error: str | None = None
+
+
+@router.post("/details")
+async def details(request: Request, body: DetailsRequest) -> DetailsResponse:
+    """Construction details read off the cleaned-up sketches by the vision LLM, for the Style screen chips.
+    Results are cached per sketch set, so going back and forth between screens doesn't ask again."""
+    state = request.app.state
+    try:
+        garment = state.catalog.garment(body.garment)
+    except KeyError as exc:
+        raise HTTPException(status_code=422, detail=exc.args[0]) from exc
+    if not body.views:
+        raise HTTPException(status_code=422, detail="Add at least one sketch")
+    sketches = {view: _upload_file(request, clean_id, "sketch.png") for view, clean_id in body.views.items()}
+
+    key = (body.garment, tuple(sorted(body.views.items())))
+    cache: dict[tuple[object, ...], SketchDetails] = state.details_cache
+    if key in cache:
+        return DetailsResponse(details=cache[key])
+    try:
+        found = await state.details.extract(garment.prompt, sketches)
+    except DetailsError as exc:
+        return DetailsResponse(error=str(exc))
+    except Exception:  # details are optional: report, don't fail the screen
+        log.exception("Reading sketch details crashed")
+        return DetailsResponse(error="Reading the sketch failed")
+    if len(cache) > 200:
+        cache.clear()
+    cache[key] = found
+    return DetailsResponse(details=found)
 
 
 def _upload_file(request: Request, clean_id: str, name: str) -> Path:

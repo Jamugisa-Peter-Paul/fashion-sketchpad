@@ -36,7 +36,7 @@ def test_depth_controlnet_is_chained_after_lines() -> None:
     wf = build_workflow("p", "lines.png", 1, RenderSettings(), depth_image="depth.png")
     depth = wf["15"]["inputs"]
     assert depth["positive"] == ["9", 0] and depth["negative"] == ["9", 1] and depth["image"] == ["14", 0]
-    assert (depth["strength"], depth["end_percent"]) == (0.6, 0.7)  # mannequin templates: shape and pose
+    assert (depth["strength"], depth["end_percent"]) == (0.6, 0.6)  # mannequin templates: shape and pose
     assert wf["11"]["inputs"]["positive"] == ["15", 0] and wf["11"]["inputs"]["negative"] == ["15", 1]
     assert validate(wf, {"lines.png": b"", "depth.png": b""}) == []
 
@@ -59,3 +59,9 @@ def test_pure_text_to_image_check_catches_img2img() -> None:
     wf["11"]["inputs"]["latent_image"] = ["20", 0]
     with pytest.raises(AssertionError):
         assert_pure_text_to_image(wf)
+
+
+@pytest.mark.parametrize(("source", "expected"), [("paper", (0.8, 0.75)), ("drawn", (0.85, 0.8))])
+def test_lines_are_held_tighter_on_a_mannequin(source: str, expected: tuple[float, float]) -> None:
+    cn = build_workflow("p", "lines.png", 1, RenderSettings(), source=source, on_mannequin=True)["9"]["inputs"]
+    assert (cn["strength"], cn["end_percent"]) == expected

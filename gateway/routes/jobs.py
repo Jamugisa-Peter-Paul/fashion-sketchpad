@@ -62,6 +62,8 @@ async def generate(request: Request, body: GenerateRequest) -> GenerateResponse:
             source=meta["source"], placement=placement, width=meta["width"], height=meta["height"]
         )
 
+    if body.views:
+        design.details = None  # a sketch changed: details read off the old one no longer apply
     design.style = body.style
     if body.title is not None:
         design.title = body.title
@@ -109,6 +111,7 @@ def job_status(request: Request, job_id: str) -> JobStatus:
             )
             for view, state in render.views.items()
         },
+        details=render.details,
     )
 
 
@@ -128,6 +131,16 @@ def job_check_image(request: Request, job_id: str, view: View) -> FileResponse:
     path = request.app.state.designs.folder(design.id) / f"check_{job_id}_{view}.png"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Check image not ready")
+    return FileResponse(path, media_type="image/png")
+
+
+@router.get("/jobs/{job_id}/{view}/depth.png")
+def job_depth_image(request: Request, job_id: str, view: View) -> FileResponse:
+    """The body depth fed to the depth ControlNet, with the garment's silhouette cut in (on-mannequin only)."""
+    design, _ = _load_job(request, job_id)
+    path = request.app.state.designs.folder(design.id) / f"depth_{job_id}_{view}.png"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="No depth image for this view")
     return FileResponse(path, media_type="image/png")
 
 

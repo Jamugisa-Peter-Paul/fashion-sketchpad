@@ -1,7 +1,9 @@
 """Prompt builder: tapped choices -> prompt text. Pure functions, no I/O.
 
 Front and back renders of a design share the seed and the exact same garment wording (colour name + hex,
-fabric, details). Changing any word between views makes the colour drift (olive vs tan).
+fabric, buttons, stitching). Changing those words between views makes the colour drift (olive vs tan).
+Only the construction details differ per view: what the sketch shows from that side (gateway/details.py),
+after the details shared by every view.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 from gateway.catalog import Catalog, Colour
+from gateway.details import SketchDetails
 
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 VIEW_HINTS = {"front": "", "back": "Back view. ", "side": "Side view. "}
@@ -31,6 +34,9 @@ class StyleOptions(BaseModel):
     scene: str = "light_room"
     finish: str = "matte_dark_grey"
     notes: str = Field(default="", max_length=300)
+    # Construction details per view (chips on the Style screen). None = read them off the sketch at render
+    # time (if the LLM is set up); an empty SketchDetails = the user removed them all.
+    details: SketchDetails | None = None
 
     @field_validator("custom_hex")
     @classmethod
@@ -108,11 +114,27 @@ def garment_description(catalog: Catalog, style: StyleOptions) -> str:
     return text
 
 
-def build_prompt(catalog: Catalog, style: StyleOptions, view: str, view_hint: bool = True) -> str:
+def view_details(catalog: Catalog, style: StyleOptions, view: str, details: SketchDetails | None = None) -> list[str]:
+    """Construction details for one view: the garment's own back-view wording from the catalog (e.g. the
+    shirt collar seen from behind), then what the sketch shows. `details` overrides style.details."""
+    details = details if details is not None else style.details
+    items = list(details.for_view(view)) if details else []
+    if view == "back":
+        back = catalog.garment(style.garment).back
+        if back and back not in items:
+            items.insert(0, back)
+    return items
+
+
+def build_prompt(
+    catalog: Catalog, style: StyleOptions, view: str, view_hint: bool = True, details: SketchDetails | None = None
+) -> str:
     scene = catalog.scene(style.scene)
     finish = catalog.find("mannequin_finishes", style.finish).prompt
     figure = catalog.find("bodies", style.body).prompt
-    prompt = scene.prompt.format(
-        garment=garment_description(catalog, style), finish=finish, figure=figure, mannequin=f"{finish} {figure}"
-    )
+    garment = garment_description(catalog, style)
+    items = view_details(catalog, style, view, details)
+    if items:
+        garment += ", with these exact construction details: " + ", ".join(items)
+    prompt = scene.prompt.format(garment=garment, finish=finish, figure=figure, mannequin=f"{finish} {figure}")
     return (VIEW_HINTS.get(view, "") if view_hint else "") + prompt
